@@ -7,4 +7,6 @@ edition = "2021"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
-fasthash = "0.4.0"
+farmhash = "1.1.5"
+t1ha = "0.1.0"
+mur3 = "0.1.0"
