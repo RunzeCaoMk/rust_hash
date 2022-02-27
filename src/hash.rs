@@ -159,7 +159,7 @@ pub enum ExtendOption {
 
 /// Data structure for hash nodes, contains key, value, and taken attributes
 #[derive(Debug, Clone)]
-struct HashNode {
+pub struct HashNode {
     key: (Field, Field),
     value: usize,
     taken: bool,
@@ -184,6 +184,18 @@ pub struct HashTable {
     BUCKET_NUMBER: usize,
     BUCKET_SIZE: usize,
     // load_factor: usize,
+}
+
+/// Implementation for HashTable's default trait
+impl Default for HashTable {
+    fn default() -> HashTable {
+        HashTable {
+            buckets: vec![],
+            taken_count: vec![],
+            BUCKET_NUMBER: 0,
+            BUCKET_SIZE: 0
+        }
+    }
 }
 
 impl HashTable {
@@ -375,9 +387,12 @@ impl HashTable {
     }
 }
 
-fn main() {
+#[cfg(test)]
+mod test_hash {
+    use super::*;
+
     // function to test basic functionality of Field
-    fn test_field() {
+    pub fn test_field() {
         let f_int = Field::IntField(1);
         let f_str = Field::StringField(String::from("Hello"));
         assert_eq!(1, f_int.unwrap_int_field());
@@ -385,7 +400,7 @@ fn main() {
     }
 
     // function to test basic functionality of user defined enum
-    fn test_my_enum() {
+    pub fn test_my_enum() {
         let s = HashFunction::FarmHash;
         match s{
             HashFunction::MurmurHash3 => { println!("Murmur3") },
@@ -396,7 +411,7 @@ fn main() {
     }
 
     // function to test std hash function for Field
-    fn test_std_hash() {
+    pub fn test_std_hash() {
         let f_int = Field::IntField(1);
         let f_str = Field::StringField(String::from("Hello"));
         assert_eq!(1742378985846435984 as usize, f_int.std_hash());
@@ -404,7 +419,7 @@ fn main() {
     }
 
     // function to test farm hash function for Field
-    fn test_farm_hash() {
+    pub fn test_farm_hash() {
         let f_int = Field::IntField(1);
         let f_str = Field::StringField(String::from("Hello"));
         assert_eq!(538479481099171624 as usize, f_int.farm_hash());
@@ -412,7 +427,7 @@ fn main() {
     }
 
     // function to test murmur3 hash function for Field
-    fn test_murmur3_hash() {
+    pub fn test_murmur3_hash() {
         let f_int = Field::IntField(1);
         let f_str = Field::StringField(String::from("Hello"));
         assert_eq!(854115492 as usize, f_int.murmur_hash3());
@@ -420,7 +435,7 @@ fn main() {
     }
 
     // function to test t1ha function for Field
-    fn test_t1ha_hash() {
+    pub fn test_t1ha_hash() {
         let f_int = Field::IntField(1);
         let f_str = Field::StringField(String::from("Hello"));
         assert_eq!(4348539232621042483 as usize, f_int.t1ha_hash());
@@ -428,7 +443,7 @@ fn main() {
     }
 
     // function to test initialization and modification of HashNode
-    fn test_hash_node() {
+    pub fn test_hash_node() {
         // init a node object with default
         let mut node = HashNode::default();
         assert_eq!((Field::IntField(0), Field::IntField(0)), node.key);
@@ -447,7 +462,7 @@ fn main() {
     }
 
     // function to test initialization of HashTable
-    fn test_table_new() {
+    pub fn test_table_new() {
         let table = HashTable::new(10, 2);
         assert_eq!(2, table.BUCKET_NUMBER);
         assert_eq!(10, table.BUCKET_SIZE);
@@ -460,7 +475,7 @@ fn main() {
     }
 
     // function to test get_bucket_index
-    fn test_get_bucket_index() {
+    pub fn test_get_bucket_index() {
         let table = HashTable::new(10, 2);
 
         let name = Field::StringField(String::from("Mark"));
@@ -470,7 +485,7 @@ fn main() {
     }
 
     // function to test linear_probe
-    fn test_linear_probe() {
+    pub fn test_linear_probe() {
         let mut table = HashTable::new(10, 1);
         table.buckets[0][0].taken = true;
 
@@ -498,13 +513,13 @@ fn main() {
     }
 
     // function to test get_index
-    fn test_get_indexes() {
-        let mut table = HashTable::new(1, 1);
+    pub fn test_get_indexes() {
+        let mut table = HashTable::new(10, 1);
         let name = Field::StringField(String::from("Mark"));
         let course_taken = Field::IntField(6);
 
         // table.buckets[0][9].taken = true;
-        table.buckets[0][0].taken = true;
+        // table.buckets[0][0].taken = true;
 
         let indexes = table.get_indexes(
             (&name, &course_taken),
@@ -512,11 +527,11 @@ fn main() {
             HashScheme::LinearProbe
         );
         assert_eq!(0, indexes.unwrap().0);
-        assert_eq!(0, indexes.unwrap().1);
+        assert_eq!(9, indexes.unwrap().1);
     }
 
     // function to test get_mut_value
-    fn test_get_mut_value() {
+    pub fn test_get_mut_value() {
         let mut table = HashTable::new(10, 1);
 
         let name = Field::StringField(String::from("Mark"));
@@ -539,7 +554,7 @@ fn main() {
     }
 
     // function to test get_value
-    fn test_get_value() {
+    pub fn test_get_value() {
         let mut table = HashTable::new(10, 1);
 
         let name = Field::StringField(String::from("Mark"));
@@ -562,7 +577,7 @@ fn main() {
     }
 
     // function to test insert
-    fn test_insert() {
+    pub fn test_insert() {
         let mut table = HashTable::new(10, 2);
 
         let name1 = Field::StringField(String::from("Mark"));
@@ -590,7 +605,7 @@ fn main() {
     }
 
     //function to test extend
-    fn test_extend() {
+    pub fn test_extend() {
         let mut table = HashTable::new(10, 1);
         let name1 = Field::StringField(String::from("Mark"));
         let course_taken1 = Field::IntField(6);
@@ -614,26 +629,83 @@ fn main() {
         assert_eq!(20, table.BUCKET_SIZE);
     }
 
-    // function to test simple hash-join
-    fn test_hash_join() {
+    mod hash {
+        use super::*;
+
+        #[test]
+        fn t_extend() {
+            test_extend();
+        }
+
+        #[test]
+        fn t_insert() {
+            test_insert();
+        }
+
+        #[test]
+        fn t_get_value() {
+            test_get_value();
+        }
+
+        #[test]
+        fn t_get_mut_value() {
+            test_get_mut_value();
+        }
+
+        #[test]
+        fn t_get_indexes() {
+            test_get_indexes();
+        }
+
+        #[test]
+        fn t_linear_probe() {
+            test_linear_probe();
+        }
+
+        #[test]
+        fn t_field() {
+            test_field();
+        }
+
+        #[test]
+        fn t_my_enum() {
+            test_my_enum();
+        }
+
+        #[test]
+        fn t_std_hash() {
+            test_std_hash();
+        }
+
+        #[test]
+        fn t_farm_hash() {
+            test_farm_hash();
+        }
+
+        #[test]
+        fn t_murmur3_hash() {
+            test_murmur3_hash();
+        }
+
+        #[test]
+        fn t_t1ha_hash() {
+            test_t1ha_hash();
+        }
+
+        #[test]
+        fn t_hash_node() {
+            test_hash_node();
+        }
+
+        #[test]
+        fn t_table_new() {
+            test_table_new();
+        }
+
+        #[test]
+        fn t_get_bucket_index() {
+            test_get_bucket_index();
+        }
 
     }
-
-    // Testing!
-    test_hash_join();
-    // test_extend();
-    // test_insert();
-    // test_get_value();
-    // test_get_mut_value();
-    // test_get_index();
-    // test_linear_probe();
-    // test_get_bucket_index();
-    // test_table_new();
-    // test_hash_node();
-    // test_t1ha_hash();
-    // test_murmur3_hash();
-    // test_farm_hash();
-    // test_std_hash();
-    // test_func_enum();
-    // test_field();
 }
