@@ -201,11 +201,11 @@ impl HashTable {
     fn get_bucket_index(&self, key: (&Field, &Field), function: HashFunction) -> Option<usize> {
         // using different hash functions to get the index for bucket
         let bucket_index = match function {
-            HashFunction::MurmurHash3 => {
-                (key.0.murmur_hash3() + key.1.murmur_hash3()) % self.BUCKET_NUMBER
-            },
             HashFunction::FarmHash => {
                 (key.0.farm_hash() + key.1.farm_hash()) % self.BUCKET_NUMBER
+            },
+            HashFunction::MurmurHash3 => {
+                (key.0.murmur_hash3() + key.1.murmur_hash3()) % self.BUCKET_NUMBER
             },
             HashFunction::T1haHash => {
                 (key.0.t1ha_hash() + key.1.t1ha_hash()) % self.BUCKET_NUMBER
@@ -216,6 +216,7 @@ impl HashTable {
         };
         // check if the bucket is full and return bucket_index
         if self.taken_count[bucket_index] >= self.BUCKET_SIZE {
+            println!("Couldn't get bucket_index!");
             None
         } else {
             Some(bucket_index)
@@ -227,9 +228,11 @@ impl HashTable {
         let mut i = index;
         // check the empty slot in the bucket
         for _ in 0..self.BUCKET_SIZE {
+            // if slot haven't been taken, find it
             if !self.buckets[target_bucket_index][i].taken {
                 break;
             }
+            // if the key is the same then find it
             if (&self.buckets[target_bucket_index][i].key.0,
                 &self.buckets[target_bucket_index][i].key.1) == key {
                 break;
@@ -239,50 +242,136 @@ impl HashTable {
         Some(i)
     }
 
-    // method to get the hash index
-    fn get_index(&self, key: &Key, function: HashFunction, scheme: HashScheme) -> Option<Vec<usize>> {
+    // TODO:
+    fn hopscotch(&self, key: (&Field, &Field), target_bucket_index: usize, index: usize) -> Option<usize> {
+        None
+    }
+
+    // TODO:
+    fn robin_hood(&self, key: (&Field, &Field), target_bucket_index: usize, index: usize) -> Option<usize> {
+        None
+    }
+
+    // method to get a tuple of (bucket_index, index)
+    fn get_indexes(&self, key: (&Field, &Field), function: HashFunction, scheme: HashScheme) -> Option<(usize, usize)> {
         // get target bucket index
-        let Some(bucket_index) = get_bucket_index(key, function)?;
-        // get the target bucket
-        let target_bucket = self.buckets[bucket_index];
+        let bucket_index = self.get_bucket_index(key, function).unwrap();
 
         // using different hash functions to get the index in one bucket
         let mut index = match function {
-            HashFunction::MurmurHash3 => {
-                key.murmurhash() % self.BUCKET_SIZE
-            },
             HashFunction::FarmHash => {
-                key.farmhash() % self.BUCKET_SIZE
+                (key.0.farm_hash() + key.1.farm_hash()) % self.BUCKET_SIZE
             },
-            HashFunction::XXHash => {
-                key.xxhash() % self.BUCKET_SIZE
+            HashFunction::MurmurHash3 => {
+                (key.0.murmur_hash3() + key.1.murmur_hash3()) % self.BUCKET_SIZE
+            },
+            HashFunction::T1haHash => {
+                (key.0.t1ha_hash() + key.1.t1ha_hash()) % self.BUCKET_SIZE
+            },
+            HashFunction::StdHash => {
+                (key.0.std_hash() + key.1.std_hash()) % self.BUCKET_SIZE
             },
         };
 
         // check if the index has been taken
-        if target_bucket[index].taken {
+        if self.buckets[bucket_index][index].taken {
             // using different hashing scheme to solve duplicate
             index = match scheme {
                 HashScheme::LinearProbe => {
-                    linear_probe(target_bucket, index)
+                    self.linear_probe(key, bucket_index, index).unwrap()
                 },
                 HashScheme::Hopscotch => {
-                    hopscotch(target_bucket, index)
+                    self.hopscotch(key, bucket_index, index).unwrap()
                 },
                 HashScheme::RobinHood => {
-                    robin_hood(target_bucket, index)
+                    self.robin_hood(key, bucket_index, index).unwrap()
                 },
             };
         }
 
-        // return the bucket_index and index
-        Some(vec![bucket_index, index])
+        // check again and return
+        if self.buckets[bucket_index][index].taken &&
+            (&self.buckets[bucket_index][index].key.0 != key.0 ||
+            &self.buckets[bucket_index][index].key.1 != key.1) {
+            // return None if couldn't find a available slot
+            println!("Couldn't get indexes.");
+            None
+        } else {
+            // return the bucket_index and index
+            Some((bucket_index, index))
+        }
+    }
 
-        // if target_bucket[index].taken && target_bucket[index].key == *key {
-        //     Some(vec![bucket_index, index])
-        // } else {
-        //     None
-        // }
+    // method to get the mutable value
+    pub fn get_mut_value(&mut self, key: (&Field, &Field), function: HashFunction, scheme: HashScheme) -> Option<&mut usize> {
+        if let Some(indexes) = self.get_indexes(key, function, scheme) {
+            Some(&mut self.buckets[indexes.0][indexes.1].value)
+        } else {
+            println!("Couldn't get mut_value");
+            None
+        }
+    }
+
+    // method to get the value
+    pub fn get_value(&self, key: (&Field, &Field), function: HashFunction, scheme: HashScheme) -> Option<&usize> {
+        if let Some(indexes) = self.get_indexes(key, function, scheme) {
+            Some(&self.buckets[indexes.0][indexes.1].value)
+        } else {
+            println!("Couldn't get value");
+            None
+        }
+    }
+
+    // method to insert a new HashNode
+    pub fn insert(&mut self, new_key: (Field, Field), new_value: usize, function: HashFunction, scheme: HashScheme) {
+        // get the tuple of (bucket_index, index)
+        if let Some(indexes) =
+        self.get_indexes((&new_key.0, &new_key.1), function, scheme){
+            // check if the the key is already existed in the table
+            if self.buckets[indexes.0][indexes.1].key == new_key {
+                // add new value to the old one
+                self.buckets[indexes.0][indexes.1].value += new_value;
+            } else {
+                // insert the new value
+                self.buckets[indexes.0][indexes.1] = HashNode {key: new_key, value: new_value, taken: true };
+                self.taken_count[indexes.0] += 1;
+            }
+        };
+    }
+
+    // method to extend the bucket number / bucket size and then rehash the table
+    pub fn extend(&mut self, op: ExtendOption, function: HashFunction, scheme: HashScheme) {
+        assert!(self.buckets.len() > 0);
+        let mut new_self = match op {
+            // extend the bucket size to twice of the original bucket size
+            ExtendOption::ExtendBucketSize => {
+                Self {
+                    buckets: vec![vec![HashNode::default(); self.BUCKET_SIZE * 2]; self.BUCKET_NUMBER],
+                    taken_count: vec![0; self.BUCKET_NUMBER],
+                    BUCKET_SIZE: self.BUCKET_SIZE * 2,
+                    BUCKET_NUMBER: self.BUCKET_NUMBER,
+                }
+            },
+            // extend the bucket number to twice of than original bucket number
+            ExtendOption::ExtendBucketNumber => {
+                Self {
+                    buckets: vec![vec![HashNode::default(); self.BUCKET_SIZE]; self.BUCKET_NUMBER * 2],
+                    taken_count: vec![0; self.BUCKET_NUMBER * 2],
+                    BUCKET_SIZE: self.BUCKET_SIZE,
+                    BUCKET_NUMBER: self.BUCKET_NUMBER * 2,
+                }
+            }
+        };
+
+        // insert the <key, value> to new hash table
+        for bucket in self.buckets.iter() {
+            for node in bucket.iter() {
+                if node.taken {
+                    new_self.insert(node.key.clone(), node.value.clone(), function, scheme);
+                }
+            }
+        }
+        *self = new_self;
     }
 }
 
@@ -342,19 +431,18 @@ fn main() {
     fn test_hash_node() {
         // init a node object with default
         let mut node = HashNode::default();
-        assert_eq!(false, node.taken);
         assert_eq!((Field::IntField(0), Field::IntField(0)), node.key);
         assert_eq!(0, node.value);
+        assert_eq!(false, node.taken);
 
         let name = Field::StringField(String::from("Mark"));
         let course_taken = Field::IntField(6);
-        let hash_value = name.std_hash() + course_taken.std_hash();
         let hash_key = (name, course_taken);
 
         // modify the node object
-        node = HashNode {key: hash_key, value: hash_value, taken: true};
+        node = HashNode {key: hash_key, value: 1, taken: true};
         assert_eq!((Field::StringField(String::from("Mark")), Field::IntField(6)), node.key);
-        assert_eq!(6821831411456522797, node.value);
+        assert_eq!(1, node.value);
         assert_eq!(true, node.taken);
     }
 
@@ -388,27 +476,156 @@ fn main() {
 
         let name = Field::StringField(String::from("Mark"));
         let course_taken = Field::IntField(6);
-        assert_eq!(table.linear_probe((&name, &course_taken), 0, 0).unwrap(), 1);
+        assert_eq!(
+            table.linear_probe((&name, &course_taken), 0, 0).unwrap(),
+            1);
 
         table.buckets[0][1].key = (name, course_taken);
         table.buckets[0][1].taken = true;
         let name = Field::StringField(String::from("Mark"));
         let course_taken = Field::IntField(6);
-        assert_eq!(table.linear_probe((&name, &course_taken), 0, 0).unwrap(), 1);
+        assert_eq!(
+            table.linear_probe((&name, &course_taken), 0, 0).unwrap(),
+            1);
 
         let name2 = Field::StringField(String::from("Jack"));
         let course_taken2 = Field::IntField(3);
         table.buckets[0][1].key = (name2, course_taken2);
         table.buckets[0][1].taken = true;
-        assert_eq!(table.linear_probe((&name, &course_taken), 0, 0).unwrap(), 2);
+        assert_eq!(
+            table.linear_probe((&name, &course_taken), 0, 0).unwrap(),
+            2);
     }
 
-    // function to
-    fn test_get_index() {
+    // function to test get_index
+    fn test_get_indexes() {
+        let mut table = HashTable::new(1, 1);
+        let name = Field::StringField(String::from("Mark"));
+        let course_taken = Field::IntField(6);
+
+        // table.buckets[0][9].taken = true;
+        table.buckets[0][0].taken = true;
+
+        let indexes = table.get_indexes(
+            (&name, &course_taken),
+            HashFunction::FarmHash,
+            HashScheme::LinearProbe
+        );
+        assert_eq!(0, indexes.unwrap().0);
+        assert_eq!(0, indexes.unwrap().1);
+    }
+
+    // function to test get_mut_value
+    fn test_get_mut_value() {
+        let mut table = HashTable::new(10, 1);
+
+        let name = Field::StringField(String::from("Mark"));
+        let course_taken = Field::IntField(6);
+        let indexes = table.get_indexes(
+            (&name, &course_taken),
+            HashFunction::FarmHash,
+            HashScheme::LinearProbe
+        ).unwrap();
+        table.buckets[indexes.0][indexes.1].key = (name, course_taken);
+        table.buckets[indexes.0][indexes.1].value = 1;
+
+        let v = table.get_mut_value(
+            (&Field::StringField(String::from("Mark")), &Field::IntField(6)),
+            HashFunction::FarmHash,
+            HashScheme::LinearProbe
+        ).unwrap();
+        let expected_v = 1 as usize;
+        assert_eq!(&expected_v, v);
+    }
+
+    // function to test get_value
+    fn test_get_value() {
+        let mut table = HashTable::new(10, 1);
+
+        let name = Field::StringField(String::from("Mark"));
+        let course_taken = Field::IntField(6);
+        let indexes = table.get_indexes(
+            (&name, &course_taken),
+            HashFunction::FarmHash,
+            HashScheme::LinearProbe
+        ).unwrap();
+        table.buckets[indexes.0][indexes.1].key = (name, course_taken);
+        table.buckets[indexes.0][indexes.1].value = 1;
+
+        let v = table.get_mut_value(
+            (&Field::StringField(String::from("Mark")), &Field::IntField(6)),
+            HashFunction::FarmHash,
+            HashScheme::LinearProbe
+        ).unwrap();
+        let expected_v = 1 as usize;
+        assert_eq!(&expected_v, v);
+    }
+
+    // function to test insert
+    fn test_insert() {
+        let mut table = HashTable::new(10, 2);
+
+        let name1 = Field::StringField(String::from("Mark"));
+        let course_taken1 = Field::IntField(6);
+        let indexes1 = table.get_indexes(
+            (&name1, &course_taken1),
+            HashFunction::T1haHash,
+            HashScheme::LinearProbe).unwrap();
+
+        table.insert((name1, course_taken1), 1, HashFunction::T1haHash, HashScheme::LinearProbe);
+        assert_eq!(Field::StringField(String::from("Mark")), table.buckets[indexes1.0][indexes1.1].key.0);
+        assert_eq!(Field::IntField(6), table.buckets[indexes1.0][indexes1.1].key.1);
+        assert_eq!(1, table.buckets[indexes1.0][indexes1.1].value);
+        assert_eq!(true, table.buckets[indexes1.0][indexes1.1].taken);
+        assert_eq!(1, table.taken_count[indexes1.0]);
+
+        let name1_2 = Field::StringField(String::from("Mark"));
+        let course_taken1_2 = Field::IntField(6);
+        table.insert((name1_2, course_taken1_2), 1, HashFunction::T1haHash, HashScheme::LinearProbe);
+        assert_eq!(Field::StringField(String::from("Mark")), table.buckets[indexes1.0][indexes1.1].key.0);
+        assert_eq!(Field::IntField(6), table.buckets[indexes1.0][indexes1.1].key.1);
+        assert_eq!(2, table.buckets[indexes1.0][indexes1.1].value);
+        assert_eq!(true, table.buckets[indexes1.0][indexes1.1].taken);
+        assert_eq!(1, table.taken_count[indexes1.0]);
+    }
+
+    //function to test extend
+    fn test_extend() {
+        let mut table = HashTable::new(10, 1);
+        let name1 = Field::StringField(String::from("Mark"));
+        let course_taken1 = Field::IntField(6);
+        table.insert((name1, course_taken1), 1, HashFunction::FarmHash, HashScheme::LinearProbe);
+        assert_eq!(1, table.taken_count[0]);
+
+        table.extend(ExtendOption::ExtendBucketNumber, HashFunction::FarmHash, HashScheme::LinearProbe);
+        assert_eq!(2, table.buckets.len());
+        assert_eq!(2, table.BUCKET_NUMBER);
+        assert_eq!(1, table.taken_count[1]);
+
+        let name1 = Field::StringField(String::from("Jenny"));
+        let course_taken1 = Field::IntField(12);
+        table.insert((name1, course_taken1), 1, HashFunction::FarmHash, HashScheme::LinearProbe);
+
+        table.extend(ExtendOption::ExtendBucketSize, HashFunction::FarmHash, HashScheme::LinearProbe);
+        assert_eq!(20, table.buckets[0].len());
+        assert_eq!(20, table.buckets[1].len());
+        // assert_eq!(20, table.buckets[2].len());
+        // assert_eq!(20, table.buckets[3].len());
+        assert_eq!(20, table.BUCKET_SIZE);
+    }
+
+    // function to test simple hash-join
+    fn test_hash_join() {
 
     }
+
     // Testing!
-    test_get_index();
+    test_hash_join();
+    // test_extend();
+    // test_insert();
+    // test_get_value();
+    // test_get_mut_value();
+    // test_get_index();
     // test_linear_probe();
     // test_get_bucket_index();
     // test_table_new();
