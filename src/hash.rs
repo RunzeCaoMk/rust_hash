@@ -160,9 +160,9 @@ pub enum ExtendOption {
 /// Data structure for hash nodes, contains key, value, and taken attributes
 #[derive(Debug, Clone)]
 pub struct HashNode {
-    key: (Field, Field),
-    value: usize,
-    taken: bool,
+    pub(crate) key: (Field, Field),
+    pub(crate) value: usize,
+    pub(crate) taken: bool,
 }
 
 /// Implementation for HashNode's default trait
@@ -179,10 +179,10 @@ impl Default for HashNode {
 /// TODO: load_factor
 /// HashTable contains vec of hash buckets
 pub struct HashTable {
-    buckets: Vec<Vec<HashNode>>,
-    taken_count: Vec<usize>,
-    BUCKET_NUMBER: usize,
-    BUCKET_SIZE: usize,
+    pub(crate) buckets: Vec<Vec<HashNode>>,
+    pub(crate) taken_count: Vec<usize>,
+    pub(crate) BUCKET_NUMBER: usize,
+    pub(crate) BUCKET_SIZE: usize,
     // load_factor: usize,
 }
 
@@ -422,6 +422,8 @@ mod test_hash {
     pub fn test_farm_hash() {
         let f_int = Field::IntField(1);
         let f_str = Field::StringField(String::from("Hello"));
+        let f_str2 = Field::StringField(String::from("There"));
+        let sum = f_int.farm_hash() + f_str2.farm_hash();
         assert_eq!(538479481099171624 as usize, f_int.farm_hash());
         assert_eq!(15404698994557526151 as usize, f_str.farm_hash());
     }
