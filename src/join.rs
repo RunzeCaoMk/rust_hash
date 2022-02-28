@@ -156,12 +156,12 @@ mod test_join {
         assert_eq!(h_e_join.right_child.len(), 4);
     }
 
-    // function to test join a HashEqJoin
-    pub fn test_join() {
+    // function to test join a HashEqJoin using FarmHash
+    pub fn test_join_farm() {
         let l_child = create_vec_tuple(
             vec![("CS", "Adam"), ("CS", "Ben"), ("CS", "Chris"), ("CS", "David")]);
         let r_child = create_vec_tuple(
-            vec![("CS", "Adam"), ("CS", "Ben"), ("CS", "Eva"), ("CS", "Fordham")]);
+            vec![("CS", "Adam"), ("CS", "Ben"), ("CS", "Chris"), ("CS", "Eva"), ("CS", "Fordham")]);
         let b_number = 2 as usize;
         let b_size = 10 as usize;
         let mut h_e_join = HashEqJoin::new(
@@ -171,10 +171,90 @@ mod test_join {
             b_size
         );
         let res_farm = h_e_join.join(HashFunction::FarmHash, HashScheme::LinearProbe);
+
+        let dep = Field::StringField(String::from("CS"));
+
+        assert_eq!(res_farm.len(), 3);
+        assert_eq!(res_farm[0], (dep.clone(), Field::StringField(String::from("Adam"))));
+        assert_eq!(res_farm[1], (dep.clone(), Field::StringField(String::from("Ben"))));
+        assert_eq!(res_farm[2], (dep.clone(), Field::StringField(String::from("Chris"))));
+
+    }
+
+    // function to test join a HashEqJoin using MurmurHash3
+    pub fn test_join_murmur3() {
+        let l_child = create_vec_tuple(
+            vec![("CS", "Adam"), ("CS", "Ben"), ("CS", "Chris"), ("CS", "David")]);
+        let r_child = create_vec_tuple(
+            vec![("CS", "Adam"), ("CS", "Ben"), ("CS", "Chris"), ("CS", "Eva"), ("CS", "Fordham")]);
+        let b_number = 2 as usize;
+        let b_size = 10 as usize;
+        let mut h_e_join = HashEqJoin::new(
+            l_child,
+            r_child,
+            b_number,
+            b_size
+        );
+
         let res_murmur = h_e_join.join(HashFunction::MurmurHash3, HashScheme::LinearProbe);
+
+        let dep = Field::StringField(String::from("CS"));
+
+        assert_eq!(res_murmur.len(), 3);
+        assert_eq!(res_murmur[0], (dep.clone(), Field::StringField(String::from("Adam"))));
+        assert_eq!(res_murmur[1], (dep.clone(), Field::StringField(String::from("Ben"))));
+        assert_eq!(res_murmur[2], (dep.clone(), Field::StringField(String::from("Chris"))));
+    }
+
+    // function to test join a HashEqJoin using std::hash
+    pub fn test_join_std() {
+        let l_child = create_vec_tuple(
+            vec![("CS", "Adam"), ("CS", "Ben"), ("CS", "Chris"), ("CS", "David")]);
+        let r_child = create_vec_tuple(
+            vec![("CS", "Adam"), ("CS", "Ben"), ("CS", "Chris"), ("CS", "Eva"), ("CS", "Fordham")]);
+        let b_number = 2 as usize;
+        let b_size = 10 as usize;
+        let mut h_e_join = HashEqJoin::new(
+            l_child,
+            r_child,
+            b_number,
+            b_size
+        );
+
         let res_std = h_e_join.join(HashFunction::StdHash, HashScheme::LinearProbe);
+
+        let dep = Field::StringField(String::from("CS"));
+
+        assert_eq!(res_std.len(), 3);
+        assert_eq!(res_std[0], (dep.clone(), Field::StringField(String::from("Adam"))));
+        assert_eq!(res_std[1], (dep.clone(), Field::StringField(String::from("Ben"))));
+        assert_eq!(res_std[2], (dep.clone(), Field::StringField(String::from("Chris"))));
+
+    }
+
+    // function to test join a HashEqJoin using T1haHash
+    pub fn test_join_t1ha() {
+        let l_child = create_vec_tuple(
+            vec![("CS", "Adam"), ("CS", "Ben"), ("CS", "Chris"), ("CS", "David")]);
+        let r_child = create_vec_tuple(
+            vec![("CS", "Adam"), ("CS", "Ben"), ("CS", "Chris"), ("CS", "Eva"), ("CS", "Fordham")]);
+        let b_number = 2 as usize;
+        let b_size = 10 as usize;
+        let mut h_e_join = HashEqJoin::new(
+            l_child,
+            r_child,
+            b_number,
+            b_size
+        );
+
         let res_t1ha = h_e_join.join(HashFunction::T1haHash, HashScheme::LinearProbe);
-        // assert_eq!(res[0], (Field::StringField(String::from("CS")), Field::StringField(String::from("Adam"))));
+
+        let dep = Field::StringField(String::from("CS"));
+
+        assert_eq!(res_t1ha.len(), 3);
+        assert_eq!(res_t1ha[0], (dep.clone(), Field::StringField(String::from("Adam"))));
+        assert_eq!(res_t1ha[1], (dep.clone(), Field::StringField(String::from("Ben"))));
+        assert_eq!(res_t1ha[2], (dep.clone(), Field::StringField(String::from("Chris"))));
     }
 
     mod join {
@@ -186,8 +266,23 @@ mod test_join {
         }
 
         #[test]
-        fn t_join() {
-            test_join();
+        fn t_join_farm() {
+            test_join_farm();
+        }
+
+        #[test]
+        fn t_join_murmur3() {
+            test_join_murmur3();
+        }
+
+        #[test]
+        fn t_join_std() {
+            test_join_std();
+        }
+
+        #[test]
+        fn t_join_t1ha() {
+            test_join_t1ha();
         }
     }
 }
