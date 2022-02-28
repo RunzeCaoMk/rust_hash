@@ -170,7 +170,10 @@ mod test_join {
             b_number,
             b_size
         );
-        let res = h_e_join.join(HashFunction::MurmurHash3, HashScheme::LinearProbe);
+        let res_farm = h_e_join.join(HashFunction::FarmHash, HashScheme::LinearProbe);
+        let res_murmur = h_e_join.join(HashFunction::MurmurHash3, HashScheme::LinearProbe);
+        let res_std = h_e_join.join(HashFunction::StdHash, HashScheme::LinearProbe);
+        let res_t1ha = h_e_join.join(HashFunction::T1haHash, HashScheme::LinearProbe);
         // assert_eq!(res[0], (Field::StringField(String::from("CS")), Field::StringField(String::from("Adam"))));
     }
 

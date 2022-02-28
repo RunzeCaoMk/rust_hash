@@ -213,17 +213,18 @@ impl HashTable {
     fn get_bucket_index(&self, key: (&Field, &Field), function: HashFunction) -> Option<usize> {
         // using different hash functions to get the index for bucket
         let bucket_index = match function {
+            // using mod 10 to prevent overflow
             HashFunction::FarmHash => {
-                (key.0.farm_hash() + key.1.farm_hash()) % self.BUCKET_NUMBER
+                (key.0.farm_hash() % 10 + key.1.farm_hash() % 10) % self.BUCKET_NUMBER
             },
             HashFunction::MurmurHash3 => {
-                (key.0.murmur_hash3() + key.1.murmur_hash3()) % self.BUCKET_NUMBER
+                (key.0.murmur_hash3() % 10 + key.1.murmur_hash3() % 10) % self.BUCKET_NUMBER
             },
             HashFunction::T1haHash => {
-                (key.0.t1ha_hash() + key.1.t1ha_hash()) % self.BUCKET_NUMBER
+                (key.0.t1ha_hash() % 10 + key.1.t1ha_hash() % 10) % self.BUCKET_NUMBER
             },
             HashFunction::StdHash => {
-                (key.0.std_hash() + key.1.std_hash()) % self.BUCKET_NUMBER
+                (key.0.std_hash() % 10 + key.1.std_hash() % 10) % self.BUCKET_NUMBER
             },
         };
         // check if the bucket is full and return bucket_index
@@ -272,16 +273,16 @@ impl HashTable {
         // using different hash functions to get the index in one bucket
         let mut index = match function {
             HashFunction::FarmHash => {
-                (key.0.farm_hash() + key.1.farm_hash()) % self.BUCKET_SIZE
+                (key.0.farm_hash() % 10 + key.1.farm_hash() % 10) % self.BUCKET_SIZE
             },
             HashFunction::MurmurHash3 => {
-                (key.0.murmur_hash3() + key.1.murmur_hash3()) % self.BUCKET_SIZE
+                (key.0.murmur_hash3() % 10 + key.1.murmur_hash3() % 10) % self.BUCKET_SIZE
             },
             HashFunction::T1haHash => {
-                (key.0.t1ha_hash() + key.1.t1ha_hash()) % self.BUCKET_SIZE
+                (key.0.t1ha_hash() % 10 + key.1.t1ha_hash() % 10) % self.BUCKET_SIZE
             },
             HashFunction::StdHash => {
-                (key.0.std_hash() + key.1.std_hash()) % self.BUCKET_SIZE
+                (key.0.std_hash() % 10 + key.1.std_hash() % 10) % self.BUCKET_SIZE
             },
         };
 
