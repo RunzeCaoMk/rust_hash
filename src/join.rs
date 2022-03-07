@@ -1,4 +1,3 @@
-use std::ptr::swap;
 use crate::common::{CrustyError, OpIterator, PredicateOp};
 use crate::hash::{Field, HashTable, HashNode, HashFunction, HashScheme};
 
@@ -36,24 +35,26 @@ impl HashEqJoin {
         r_child: Vec<(Field,Field)>,
         bucket_number: usize,
         bucket_size: usize,
+        func: HashFunction,
+        sche: HashScheme,
     ) -> Self {
         Self {
             open: false,
             left_child: l_child,
             right_child: r_child,
-            join_hash_table: HashTable::new(bucket_size, bucket_number),
+            join_hash_table: HashTable::new(bucket_size, bucket_number, func, sche),
             current_node: None,
             current_bucket: None,
         }
     }
 
-    pub fn join(&mut self, function: HashFunction, scheme: HashScheme) -> Vec<(Field, Field)> {
+    pub fn join(&mut self) -> Vec<(Field, Field)> {
         let mut res = Vec::default();
         for tuple in self.left_child.clone() {
-            self.join_hash_table.insert(tuple, 1, function, scheme);
+            self.join_hash_table.insert(tuple, 1);
         }
         for tuple in self.right_child.clone() {
-            if self.join_hash_table.get_value((&tuple.0, &tuple.1), function, scheme) == Some(&(1 as usize)) {
+            if self.join_hash_table.get_value((&tuple.0, &tuple.1)) == Some(&(1 as usize)) {
                 res.push(tuple);
             }
         }
@@ -149,7 +150,9 @@ mod test_join {
             l_child,
             r_child,
             b_number,
-            b_size
+            b_size,
+            HashFunction::FarmHash,
+            HashScheme::LinearProbe,
         );
         assert_eq!(h_e_join.open, false);
         assert_eq!(h_e_join.left_child.len(), 4);
@@ -168,9 +171,11 @@ mod test_join {
             l_child,
             r_child,
             b_number,
-            b_size
+            b_size,
+            HashFunction::FarmHash,
+            HashScheme::LinearProbe,
         );
-        let res_farm = h_e_join.join(HashFunction::FarmHash, HashScheme::LinearProbe);
+        let res_farm = h_e_join.join();
 
         let dep = Field::StringField(String::from("CS"));
 
@@ -193,10 +198,12 @@ mod test_join {
             l_child,
             r_child,
             b_number,
-            b_size
+            b_size,
+            HashFunction::MurmurHash3,
+            HashScheme::LinearProbe,
         );
 
-        let res_murmur = h_e_join.join(HashFunction::MurmurHash3, HashScheme::LinearProbe);
+        let res_murmur = h_e_join.join();
 
         let dep = Field::StringField(String::from("CS"));
 
@@ -218,10 +225,12 @@ mod test_join {
             l_child,
             r_child,
             b_number,
-            b_size
+            b_size,
+            HashFunction::StdHash,
+            HashScheme::LinearProbe,
         );
 
-        let res_std = h_e_join.join(HashFunction::StdHash, HashScheme::LinearProbe);
+        let res_std = h_e_join.join();
 
         let dep = Field::StringField(String::from("CS"));
 
@@ -244,10 +253,12 @@ mod test_join {
             l_child,
             r_child,
             b_number,
-            b_size
+            b_size,
+            HashFunction::T1haHash,
+            HashScheme::LinearProbe,
         );
 
-        let res_t1ha = h_e_join.join(HashFunction::T1haHash, HashScheme::LinearProbe);
+        let res_t1ha = h_e_join.join();
 
         let dep = Field::StringField(String::from("CS"));
 
