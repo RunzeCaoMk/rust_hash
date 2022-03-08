@@ -39,12 +39,13 @@ impl HashEqJoin {
         sche: HashScheme,
         h: usize,
         op: ExtendOption,
+        load_f: f64,
     ) -> Self {
         Self {
             open: false,
             left_child: l_child,
             right_child: r_child,
-            join_hash_table: HashTable::new(bucket_size, bucket_number, func, sche, h, op),
+            join_hash_table: HashTable::new(bucket_size, bucket_number, func, sche, h, op, load_f),
             current_node: None,
             current_bucket: None,
         }
@@ -157,6 +158,7 @@ mod test_join {
             HashScheme::LinearProbe,
             4,
             ExtendOption::ExtendBucketSize,
+            0.9,
         );
         assert_eq!(h_e_join.open, false);
         assert_eq!(h_e_join.left_child.len(), 4);
@@ -180,6 +182,7 @@ mod test_join {
             HashScheme::LinearProbe,
             4,
             ExtendOption::ExtendBucketSize,
+            0.9,
         );
         let res_farm = h_e_join.join();
 
@@ -209,6 +212,7 @@ mod test_join {
             HashScheme::LinearProbe,
             4,
             ExtendOption::ExtendBucketSize,
+            0.9,
         );
 
         let res_murmur = h_e_join.join();
@@ -238,6 +242,7 @@ mod test_join {
             HashScheme::LinearProbe,
             4,
             ExtendOption::ExtendBucketSize,
+            0.9,
         );
 
         let res_std = h_e_join.join();
@@ -268,6 +273,7 @@ mod test_join {
             HashScheme::LinearProbe,
             4,
             ExtendOption::ExtendBucketSize,
+            0.9,
         );
 
         let res_t1ha = h_e_join.join();

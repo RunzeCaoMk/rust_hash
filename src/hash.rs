@@ -178,7 +178,6 @@ impl Default for HashNode {
     }
 }
 
-/// TODO: load_factor
 /// HashTable contains vec of hash buckets
 pub struct HashTable {
     pub(crate) buckets: Vec<Vec<HashNode>>,
@@ -190,7 +189,7 @@ pub struct HashTable {
     pub(crate) H: usize,
     pub(crate) extend_op: ExtendOption,
     pub(crate) hop_info: Vec<usize>,
-    // load_factor: usize,
+    pub(crate) load_factor: f64,
 }
 
 /// Implementation for HashTable's default trait
@@ -206,6 +205,7 @@ impl Default for HashTable {
             H: 4,
             extend_op: ExtendOption::ExtendBucketSize,
             hop_info: vec![],
+            load_factor: 0.9,
         }
     }
 }
@@ -218,7 +218,8 @@ impl HashTable {
         func: HashFunction,
         sche: HashScheme,
         h: usize,
-        op: ExtendOption
+        op: ExtendOption,
+        load_f: f64,
     ) -> Self {
         Self {
             buckets: vec![vec![HashNode::default(); b_size]; b_num],
@@ -230,6 +231,7 @@ impl HashTable {
             H: h,
             extend_op: op,
             hop_info: vec![0; b_size],
+            load_factor: load_f,
         }
     }
 
@@ -317,7 +319,7 @@ impl HashTable {
     // method to get a tuple of (bucket_index, index, distance)
     fn get_indexes(&mut self, key: (&Field, &Field)) -> Option<(usize, usize, usize)> {
         // get target bucket index
-        let bucket_index = self.get_bucket_index(key).unwrap();
+        let bucket_index = self.get_bucket_index(key)?;
 
         // using different hash functions to get the index in one bucket
         let mut index = match self.function {
@@ -458,6 +460,14 @@ impl HashTable {
 
     // method to insert a new HashNode
     pub fn insert(&mut self, new_key: (Field, Field), new_value: usize) {
+        // extent the hash table once reach the load limit
+        for i in 0..self.BUCKET_NUMBER {
+            if self.BUCKET_SIZE * self.load_factor < self.taken_count[i] {
+                self.extend();
+                self.insert(new_key.clone(), new_value);
+            }
+        }
+
         // get the tuple of (bucket_index, index)
         if let Some(indexes) =
         self.get_indexes((&new_key.0, &new_key.1)){
@@ -476,6 +486,9 @@ impl HashTable {
                 self.buckets[indexes.0][indexes.1] = HashNode {key: new_key, value: new_value, taken: true, dis: indexes.2};
                 self.insert(ori_node.key, ori_node.value);
             }
+        } else {
+            self.extend();
+            self.insert(new_key.clone(), new_value);
         };
     }
 
@@ -495,6 +508,7 @@ impl HashTable {
                     H: self.H,
                     extend_op: self.extend_op,
                     hop_info: self.hop_info.clone(),
+                    load_factor: self.load_factor,
                 }
             },
             // extend the bucket number to twice of than original bucket number
@@ -509,6 +523,7 @@ impl HashTable {
                     H: self.H,
                     extend_op: self.extend_op,
                     hop_info: self.hop_info.clone(),
+                    load_factor: self.load_factor,
                 }
             }
         };
@@ -537,7 +552,8 @@ mod test_hash {
             HashFunction::FarmHash,
             HashScheme::Hopscotch,
             4,
-            ExtendOption::ExtendBucketSize
+            ExtendOption::ExtendBucketSize,
+            0.9,
         );
         table.buckets[0][0].taken = true;
         table.buckets[0][1].taken = true;
@@ -570,12 +586,15 @@ mod test_hash {
 
     // function to test insert with robin hood scheme
     pub fn test_insert_robin_hood() {
-        let mut table = HashTable::new(4,
-                                       1,
-                                       HashFunction::StdHash,
-                                       HashScheme::RobinHood,
-                                       4,
-                                       ExtendOption::ExtendBucketSize);
+        let mut table = HashTable::new(
+            4,
+            1,
+            HashFunction::StdHash,
+            HashScheme::RobinHood,
+            4,
+            ExtendOption::ExtendBucketSize,
+            0.9,
+        );
 
         // HN1 -> 0
         let name = Field::StringField(String::from("Adam"));
@@ -708,7 +727,8 @@ mod test_hash {
             HashFunction::StdHash,
             HashScheme::LinearProbe,
             4,
-            ExtendOption::ExtendBucketSize
+            ExtendOption::ExtendBucketSize,
+            0.9,
         );
         assert_eq!(2, table.BUCKET_NUMBER);
         assert_eq!(10, table.BUCKET_SIZE);
@@ -723,7 +743,15 @@ mod test_hash {
 
     // function to test get_bucket_index
     pub fn test_get_bucket_index() {
-        let table = HashTable::new(10, 2, HashFunction::MurmurHash3, HashScheme::LinearProbe, 4, ExtendOption::ExtendBucketSize);
+        let table = HashTable::new(
+            10,
+            2,
+            HashFunction::MurmurHash3,
+            HashScheme::LinearProbe,
+            4,
+            ExtendOption::ExtendBucketSize,
+            0.9,
+        );
 
         let name = Field::StringField(String::from("Mark"));
         let course_taken = Field::IntField(6);
@@ -733,7 +761,15 @@ mod test_hash {
 
     // function to test linear_probe
     pub fn test_linear_probe() {
-        let mut table = HashTable::new(10, 1, HashFunction::StdHash, HashScheme::LinearProbe, 4, ExtendOption::ExtendBucketSize);
+        let mut table = HashTable::new(
+            10,
+            1,
+            HashFunction::StdHash,
+            HashScheme::LinearProbe,
+            4,
+            ExtendOption::ExtendBucketSize,
+            0.9,
+        );
         table.buckets[0][0].taken = true;
 
         let name = Field::StringField(String::from("Mark"));
@@ -761,7 +797,15 @@ mod test_hash {
 
     // function to test get_index
     pub fn test_get_indexes() {
-        let mut table = HashTable::new(10, 1, HashFunction::FarmHash, HashScheme::LinearProbe, 4, ExtendOption::ExtendBucketSize);
+        let mut table = HashTable::new(
+            10,
+            1,
+            HashFunction::FarmHash,
+            HashScheme::LinearProbe,
+            4,
+            ExtendOption::ExtendBucketSize,
+            0.9,
+        );
         let name = Field::StringField(String::from("Mark"));
         let course_taken = Field::IntField(6);
 
@@ -776,7 +820,15 @@ mod test_hash {
 
     // function to test get_mut_value
     pub fn test_get_mut_value() {
-        let mut table = HashTable::new(10, 1, HashFunction::FarmHash, HashScheme::LinearProbe, 4, ExtendOption::ExtendBucketSize);
+        let mut table = HashTable::new(
+            10,
+            1,
+            HashFunction::FarmHash,
+            HashScheme::LinearProbe,
+            4,
+            ExtendOption::ExtendBucketSize,
+            0.9,
+        );
 
         let name = Field::StringField(String::from("Mark"));
         let course_taken = Field::IntField(6);
@@ -792,7 +844,15 @@ mod test_hash {
 
     // function to test get_value
     pub fn test_get_value() {
-        let mut table = HashTable::new(10, 1, HashFunction::FarmHash, HashScheme::LinearProbe, 4, ExtendOption::ExtendBucketSize);
+        let mut table = HashTable::new(
+            10,
+            1,
+            HashFunction::FarmHash,
+            HashScheme::LinearProbe,
+            4,
+            ExtendOption::ExtendBucketSize,
+            0.9,
+        );
 
         let name = Field::StringField(String::from("Mark"));
         let course_taken = Field::IntField(6);
@@ -808,7 +868,15 @@ mod test_hash {
 
     // function to test insert
     pub fn test_insert() {
-        let mut table = HashTable::new(10, 2, HashFunction::T1haHash, HashScheme::LinearProbe, 4, ExtendOption::ExtendBucketSize);
+        let mut table = HashTable::new(
+            10,
+            2,
+            HashFunction::T1haHash,
+            HashScheme::LinearProbe,
+            4,
+            ExtendOption::ExtendBucketSize,
+            0.9,
+        );
 
         let name1 = Field::StringField(String::from("Mark"));
         let course_taken1 = Field::IntField(6);
@@ -833,7 +901,15 @@ mod test_hash {
 
     // function to test extend
     pub fn test_extend() {
-        let mut table = HashTable::new(10, 1, HashFunction::FarmHash, HashScheme::LinearProbe, 4, ExtendOption::ExtendBucketNumber);
+        let mut table = HashTable::new(
+            10,
+            1,
+            HashFunction::FarmHash,
+            HashScheme::LinearProbe,
+            4,
+            ExtendOption::ExtendBucketNumber,
+            0.9,
+        );
         let name1 = Field::StringField(String::from("Mark"));
         let course_taken1 = Field::IntField(6);
         table.insert((name1, course_taken1), 1);
@@ -859,7 +935,15 @@ mod test_hash {
 
     // function to test robin_hood
     pub fn test_robin_hood() {
-        let mut table = HashTable::new(10, 1, HashFunction::StdHash, HashScheme::RobinHood, 4, ExtendOption::ExtendBucketSize);
+        let mut table = HashTable::new(
+            10,
+            1,
+            HashFunction::StdHash,
+            HashScheme::RobinHood,
+            4,
+            ExtendOption::ExtendBucketSize,
+            0.9,
+        );
 
         // HN1 -> 0
         let name = Field::StringField(String::from("Adam"));
