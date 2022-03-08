@@ -416,13 +416,13 @@ impl HashTable {
                     for candidate_index in start_index..(start_index + self.H) {
                         // some slot in
                         if self.hop_info[candidate_index] > 0 {
-                            for n in (self.H - 1)..0 {
+                            for n in (0..self.H).rev() {
                                 if (self.hop_info[candidate_index] & (1 << n as usize)) != 0 {
                                     // swap the target with empty slot
                                     self.buckets[bucket_index][empty_index] = self.buckets[bucket_index][candidate_index + (self.H - 1 - n)].clone();
                                     self.buckets[bucket_index][candidate_index + (self.H - 1 - n)] = HashNode::default();
-                                    self.hop_info[candidate_index] |= 0 << n as usize;
-                                    self.hop_info[candidate_index] |= 1 << 0 as usize;
+                                    self.hop_info[candidate_index] -= usize::pow(2, n as u32);
+                                    self.hop_info[candidate_index] |= (1 << 0 as usize);
                                     empty_index = candidate_index + (self.H - 1 - n);
                                     break;
                                 }
@@ -549,19 +549,22 @@ mod test_hash {
         table.buckets[0][6].taken = true;
         table.buckets[0][7].taken = true;
         table.hop_info[7] = 4;
-        // table.buckets[0][8].taken = true;
-        // table.buckets[0][9].taken = true;
-        // table.buckets[0][9].hop_info = 4;
-        // table.buckets[0][10].taken = true;
-        // table.buckets[0][11].taken = true;
-        table.taken_count[0] = 7;
+        table.buckets[0][8].taken = true;
+        table.buckets[0][9].taken = true;
+        table.hop_info[9] = 4;
+        table.buckets[0][10].taken = true;
+        table.buckets[0][11].taken = true;
+        table.taken_count[0] = 11;
 
         let name = Field::StringField(String::from("Mark"));
         let course_taken = Field::IntField(8);
         table.insert((name, course_taken), 1);
+        assert_eq!(table.hop_info[9], 1);
+        assert_eq!(table.hop_info[7], 1);
         assert_eq!(table.hop_info[5], 3);
         assert_eq!(table.hop_info[3], 6);
-        assert_eq!(table.taken_count[0], 8);
+        assert_eq!(table.buckets[0][12].taken, true);
+        assert_eq!(table.taken_count[0], 12);
         // assert_eq!(table.buckets[0][4].value, 2);
     }
 
