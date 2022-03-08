@@ -143,7 +143,7 @@ pub enum HashFunction {
 }
 
 /// Different types of hash schemes
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum HashScheme {
     LinearProbe,
     RobinHood,
@@ -187,6 +187,9 @@ pub struct HashTable {
     pub(crate) BUCKET_SIZE: usize,
     pub(crate) function: HashFunction,
     pub(crate) scheme: HashScheme,
+    pub(crate) H: usize,
+    pub(crate) extend_op: ExtendOption,
+    pub(crate) hop_info: Vec<usize>,
     // load_factor: usize,
 }
 
@@ -200,13 +203,23 @@ impl Default for HashTable {
             BUCKET_SIZE: 0,
             function: HashFunction::StdHash,
             scheme: HashScheme::LinearProbe,
+            H: 4,
+            extend_op: ExtendOption::ExtendBucketSize,
+            hop_info: vec![],
         }
     }
 }
 
 impl HashTable {
     // initialize a new hash table with certain BUCKET_SIZE and BUCKET_NUMBER, HashFunction and HashScheme
-    pub fn new(b_size: usize, b_num: usize, func: HashFunction, sche: HashScheme) -> Self {
+    pub fn new(
+        b_size: usize,
+        b_num: usize,
+        func: HashFunction,
+        sche: HashScheme,
+        h: usize,
+        op: ExtendOption
+    ) -> Self {
         Self {
             buckets: vec![vec![HashNode::default(); b_size]; b_num],
             taken_count: vec![0; b_num],
@@ -214,6 +227,9 @@ impl HashTable {
             BUCKET_SIZE: b_size,
             function: func,
             scheme: sche,
+            H: h,
+            extend_op: op,
+            hop_info: vec![0; b_size],
         }
     }
 
@@ -245,7 +261,12 @@ impl HashTable {
     }
 
     // method to use linear probe hashing to resolve collision
-    fn linear_probe(&self, key: (&Field, &Field), target_bucket_index: usize, index: usize) -> Option<usize> {
+    fn linear_probe(
+        &self,
+        key: (&Field, &Field),
+        target_bucket_index: usize,
+        index: usize
+    ) -> Option<usize> {
         let mut i = index;
         // check the empty slot in the bucket
         for _ in 0..self.BUCKET_SIZE {
@@ -263,13 +284,13 @@ impl HashTable {
         Some(i)
     }
 
-    // TODO: method to use hopscotch hashing to resolve collision
-    fn hopscotch(&self, key: (&Field, &Field), target_bucket_index: usize, index: usize) -> Option<usize> {
-        None
-    }
-
     // method to use robin hood hashing to resolve collision
-    fn robin_hood(&self, key: (&Field, &Field), bucket_index: usize, ori_index: usize) -> Option<(usize, usize)> {
+    fn robin_hood(
+        &self,
+        key: (&Field, &Field),
+        bucket_index: usize,
+        ori_index: usize
+    ) -> Option<(usize, usize)> {
         let mut index = ori_index;
         let mut distance = 0;
         // check the empty slot in the bucket
@@ -293,8 +314,8 @@ impl HashTable {
         return Some((index, distance));
     }
 
-    // method to get a tuple of (bucket_index, index)
-    fn get_indexes(&self, key: (&Field, &Field)) -> Option<(usize, usize, usize)> {
+    // method to get a tuple of (bucket_index, index, distance)
+    fn get_indexes(&mut self, key: (&Field, &Field)) -> Option<(usize, usize, usize)> {
         // get target bucket index
         let bucket_index = self.get_bucket_index(key).unwrap();
 
@@ -323,7 +344,7 @@ impl HashTable {
                     index = self.linear_probe(key, bucket_index, index).unwrap();
                 },
                 HashScheme::Hopscotch => {
-                    index = self.hopscotch(key, bucket_index, index).unwrap();
+                    return Some((bucket_index, index, dis));
                 },
                 HashScheme::RobinHood => {
                     let res = self.robin_hood(key, bucket_index, index).unwrap();
@@ -358,7 +379,7 @@ impl HashTable {
     }
 
     // method to get the value
-    pub fn get_value(&self, key: (&Field, &Field)) -> Option<&usize> {
+    pub fn get_value(&mut self, key: (&Field, &Field)) -> Option<&usize> {
         if let Some(indexes) = self.get_indexes(key) {
             Some(&self.buckets[indexes.0][indexes.1].value)
         } else {
@@ -367,32 +388,101 @@ impl HashTable {
         }
     }
 
+    // method to use hopscotch hashing to insert
+    fn hopscotch_insert(&mut self, new_key: (Field, Field), new_value: usize, indexes: (usize, usize)) {
+        let bucket_index = indexes.0;
+        let index = indexes.1;
+        // look through neighborhood for empty space or same key
+        let end_of_H = std::cmp::min(index + self.H, self.BUCKET_SIZE);
+        for i in index..end_of_H {
+            if self.buckets[bucket_index][i].taken == false {  // slot is empty, insert the node
+                // put entry in empty space
+                self.buckets[bucket_index][i] = HashNode { key: new_key.clone(), value: new_value, taken: true, dis: 0};
+                self.hop_info[index] |= 1 << (self.H - 1 - (i - index));
+                self.taken_count[bucket_index] += 1;
+                return
+            } else if self.buckets[bucket_index][i].key == new_key { // same key, then update value
+                self.buckets[bucket_index][i].value += new_value;
+                return
+            }
+        }
+
+        // if no room in neighborhood, look through the rest of the table for an empty space to swap with
+        // empty_index -> potentially empty index, start_index -> interval starting index, candidate_index -> swap candidate index
+        for mut empty_index in end_of_H..self.BUCKET_SIZE {
+            if self.buckets[bucket_index][empty_index].taken == false {  // find empty slot
+                let mut start_index = empty_index - (self.H - 1);
+                'inner: loop {
+                    for candidate_index in start_index..(start_index + self.H) {
+                        // some slot in
+                        if self.hop_info[candidate_index] > 0 {
+                            for n in (self.H - 1)..0 {
+                                if (self.hop_info[candidate_index] & (1 << n as usize)) != 0 {
+                                    // swap the target with empty slot
+                                    self.buckets[bucket_index][empty_index] = self.buckets[bucket_index][candidate_index + (self.H - 1 - n)].clone();
+                                    self.buckets[bucket_index][candidate_index + (self.H - 1 - n)] = HashNode::default();
+                                    self.hop_info[candidate_index] |= 0 << n as usize;
+                                    self.hop_info[candidate_index] |= 1 << 0 as usize;
+                                    empty_index = candidate_index + (self.H - 1 - n);
+                                    break;
+                                }
+                            }
+                            // prepare to restart search for another swap
+                            if empty_index - (self.H - 1) > 0 {
+                                start_index = empty_index - (self.H - 1)
+                            } else {
+                                start_index = 0
+                            }
+
+                            if empty_index - index < self.H {
+                                // we are now within the neighborhood, so put new entry in empty space
+                                self.buckets[bucket_index][empty_index] = HashNode { key: new_key.clone(), value: new_value, taken: true, dis: 0};
+                                self.hop_info[index] |= 1 << (self.H - 1 - (empty_index - index) as usize);
+                                self.taken_count[bucket_index] += 1;
+                                return
+                            } else {
+                                // look for another swap to move empty closer (or into) neighborhood
+                                continue 'inner
+                            }
+                        }
+                    }
+                    // can't swap anything with empty space, need to resize
+                    println!("Can't swap it into the neighborhood!");
+                    break;
+                }
+            }
+        }
+        println!("No empty space!");
+        panic!();
+    }
+
     // method to insert a new HashNode
     pub fn insert(&mut self, new_key: (Field, Field), new_value: usize) {
         // get the tuple of (bucket_index, index)
         if let Some(indexes) =
         self.get_indexes((&new_key.0, &new_key.1)){
-            // check if the the key is already existed in the table
-            if self.buckets[indexes.0][indexes.1].key == new_key {
+            if self.scheme == HashScheme::Hopscotch { // using helper method to insert w/ hopscotch
+                self.hopscotch_insert(new_key, new_value, (indexes.0, indexes.1));
+            } else if self.buckets[indexes.0][indexes.1].key == new_key { // check if the the key is already existed in the table
                 // add new value to the old one
                 self.buckets[indexes.0][indexes.1].value += new_value;
             } else if self.buckets[indexes.0][indexes.1].taken == false { // if not been taken
                 // directly insert the new value
-                self.buckets[indexes.0][indexes.1] = HashNode {key: new_key, value: new_value, taken: true, dis: indexes.2 };
+                self.buckets[indexes.0][indexes.1] = HashNode {key: new_key, value: new_value, taken: true, dis: indexes.2};
                 self.taken_count[indexes.0] += 1;
-            } else { // if the slot already been taken
-                // insert the new value and insert the origin value
+            } else { // robin hood situation
+                // insert the new node and then original node
                 let ori_node = self.buckets[indexes.0][indexes.1].clone();
-                self.buckets[indexes.0][indexes.1] = HashNode {key: new_key, value: new_value, taken: true, dis: indexes.2 };
+                self.buckets[indexes.0][indexes.1] = HashNode {key: new_key, value: new_value, taken: true, dis: indexes.2};
                 self.insert(ori_node.key, ori_node.value);
             }
         };
     }
 
     // method to extend the bucket number / bucket size and then rehash the table
-    pub fn extend(&mut self, op: ExtendOption) {
+    pub fn extend(&mut self) {
         assert!(self.buckets.len() > 0);
-        let mut new_self = match op {
+        let mut new_self = match self.extend_op {
             // extend the bucket size to twice of the original bucket size
             ExtendOption::ExtendBucketSize => {
                 Self {
@@ -402,6 +492,9 @@ impl HashTable {
                     BUCKET_NUMBER: self.BUCKET_NUMBER,
                     function: self.function,
                     scheme: self.scheme,
+                    H: self.H,
+                    extend_op: self.extend_op,
+                    hop_info: self.hop_info.clone(),
                 }
             },
             // extend the bucket number to twice of than original bucket number
@@ -413,6 +506,9 @@ impl HashTable {
                     BUCKET_NUMBER: self.BUCKET_NUMBER * 2,
                     function: self.function,
                     scheme: self.scheme,
+                    H: self.H,
+                    extend_op: self.extend_op,
+                    hop_info: self.hop_info.clone(),
                 }
             }
         };
@@ -435,12 +531,48 @@ mod test_hash {
 
     // function to test hopscotch
     pub fn test_hopscotch() {
+        let mut table = HashTable::new(
+            13,
+            1,
+            HashFunction::FarmHash,
+            HashScheme::Hopscotch,
+            4,
+            ExtendOption::ExtendBucketSize
+        );
+        table.buckets[0][0].taken = true;
+        table.buckets[0][1].taken = true;
+        table.buckets[0][3].taken = true;
+        table.hop_info[3] = 4;
+        table.buckets[0][4].taken = true;
+        table.buckets[0][5].taken = true;
+        table.hop_info[5] = 10;
+        table.buckets[0][6].taken = true;
+        table.buckets[0][7].taken = true;
+        table.hop_info[7] = 4;
+        // table.buckets[0][8].taken = true;
+        // table.buckets[0][9].taken = true;
+        // table.buckets[0][9].hop_info = 4;
+        // table.buckets[0][10].taken = true;
+        // table.buckets[0][11].taken = true;
+        table.taken_count[0] = 7;
 
+        let name = Field::StringField(String::from("Mark"));
+        let course_taken = Field::IntField(8);
+        table.insert((name, course_taken), 1);
+        assert_eq!(table.hop_info[5], 3);
+        assert_eq!(table.hop_info[3], 6);
+        assert_eq!(table.taken_count[0], 8);
+        // assert_eq!(table.buckets[0][4].value, 2);
     }
 
     // function to test insert with robin hood scheme
     pub fn test_insert_robin_hood() {
-        let mut table = HashTable::new(4, 1, HashFunction::StdHash, HashScheme::RobinHood);
+        let mut table = HashTable::new(4,
+                                       1,
+                                       HashFunction::StdHash,
+                                       HashScheme::RobinHood,
+                                       4,
+                                       ExtendOption::ExtendBucketSize);
 
         // HN1 -> 0
         let name = Field::StringField(String::from("Adam"));
@@ -567,7 +699,14 @@ mod test_hash {
 
     // function to test initialization of HashTable
     pub fn test_table_new() {
-        let table = HashTable::new(10, 2, HashFunction::StdHash, HashScheme::LinearProbe);
+        let table = HashTable::new(
+            10,
+            2,
+            HashFunction::StdHash,
+            HashScheme::LinearProbe,
+            4,
+            ExtendOption::ExtendBucketSize
+        );
         assert_eq!(2, table.BUCKET_NUMBER);
         assert_eq!(10, table.BUCKET_SIZE);
         assert_eq!(vec![0; 2],table.taken_count);
@@ -576,11 +715,12 @@ mod test_hash {
         assert_eq!(false, table.buckets[0][0].taken);
         assert_eq!((Field::IntField(0), Field::IntField(0)), table.buckets[0][0].key);
         assert_eq!(0, table.buckets[0][0].value);
+        assert_eq!(4, table.H);
     }
 
     // function to test get_bucket_index
     pub fn test_get_bucket_index() {
-        let table = HashTable::new(10, 2, HashFunction::MurmurHash3, HashScheme::LinearProbe);
+        let table = HashTable::new(10, 2, HashFunction::MurmurHash3, HashScheme::LinearProbe, 4, ExtendOption::ExtendBucketSize);
 
         let name = Field::StringField(String::from("Mark"));
         let course_taken = Field::IntField(6);
@@ -590,7 +730,7 @@ mod test_hash {
 
     // function to test linear_probe
     pub fn test_linear_probe() {
-        let mut table = HashTable::new(10, 1, HashFunction::StdHash, HashScheme::LinearProbe);
+        let mut table = HashTable::new(10, 1, HashFunction::StdHash, HashScheme::LinearProbe, 4, ExtendOption::ExtendBucketSize);
         table.buckets[0][0].taken = true;
 
         let name = Field::StringField(String::from("Mark"));
@@ -618,7 +758,7 @@ mod test_hash {
 
     // function to test get_index
     pub fn test_get_indexes() {
-        let mut table = HashTable::new(10, 1, HashFunction::FarmHash, HashScheme::LinearProbe);
+        let mut table = HashTable::new(10, 1, HashFunction::FarmHash, HashScheme::LinearProbe, 4, ExtendOption::ExtendBucketSize);
         let name = Field::StringField(String::from("Mark"));
         let course_taken = Field::IntField(6);
 
@@ -633,7 +773,7 @@ mod test_hash {
 
     // function to test get_mut_value
     pub fn test_get_mut_value() {
-        let mut table = HashTable::new(10, 1, HashFunction::FarmHash, HashScheme::LinearProbe);
+        let mut table = HashTable::new(10, 1, HashFunction::FarmHash, HashScheme::LinearProbe, 4, ExtendOption::ExtendBucketSize);
 
         let name = Field::StringField(String::from("Mark"));
         let course_taken = Field::IntField(6);
@@ -649,7 +789,7 @@ mod test_hash {
 
     // function to test get_value
     pub fn test_get_value() {
-        let mut table = HashTable::new(10, 1, HashFunction::FarmHash, HashScheme::LinearProbe);
+        let mut table = HashTable::new(10, 1, HashFunction::FarmHash, HashScheme::LinearProbe, 4, ExtendOption::ExtendBucketSize);
 
         let name = Field::StringField(String::from("Mark"));
         let course_taken = Field::IntField(6);
@@ -665,7 +805,7 @@ mod test_hash {
 
     // function to test insert
     pub fn test_insert() {
-        let mut table = HashTable::new(10, 2, HashFunction::T1haHash, HashScheme::LinearProbe);
+        let mut table = HashTable::new(10, 2, HashFunction::T1haHash, HashScheme::LinearProbe, 4, ExtendOption::ExtendBucketSize);
 
         let name1 = Field::StringField(String::from("Mark"));
         let course_taken1 = Field::IntField(6);
@@ -690,13 +830,13 @@ mod test_hash {
 
     // function to test extend
     pub fn test_extend() {
-        let mut table = HashTable::new(10, 1, HashFunction::FarmHash, HashScheme::LinearProbe);
+        let mut table = HashTable::new(10, 1, HashFunction::FarmHash, HashScheme::LinearProbe, 4, ExtendOption::ExtendBucketNumber);
         let name1 = Field::StringField(String::from("Mark"));
         let course_taken1 = Field::IntField(6);
         table.insert((name1, course_taken1), 1);
         assert_eq!(1, table.taken_count[0]);
 
-        table.extend(ExtendOption::ExtendBucketNumber);
+        table.extend();
         assert_eq!(2, table.buckets.len());
         assert_eq!(2, table.BUCKET_NUMBER);
         assert_eq!(1, table.taken_count[1]);
@@ -705,7 +845,8 @@ mod test_hash {
         let course_taken1 = Field::IntField(12);
         table.insert((name1, course_taken1), 1);
 
-        table.extend(ExtendOption::ExtendBucketSize);
+        table.extend_op = ExtendOption::ExtendBucketSize;
+        table.extend();
         assert_eq!(20, table.buckets[0].len());
         assert_eq!(20, table.buckets[1].len());
         // assert_eq!(20, table.buckets[2].len());
@@ -715,7 +856,7 @@ mod test_hash {
 
     // function to test robin_hood
     pub fn test_robin_hood() {
-        let mut table = HashTable::new(10, 1, HashFunction::StdHash, HashScheme::RobinHood);
+        let mut table = HashTable::new(10, 1, HashFunction::StdHash, HashScheme::RobinHood, 4, ExtendOption::ExtendBucketSize);
 
         // HN1 -> 0
         let name = Field::StringField(String::from("Adam"));

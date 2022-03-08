@@ -1,5 +1,5 @@
 use crate::common::{CrustyError, OpIterator, PredicateOp};
-use crate::hash::{Field, HashTable, HashNode, HashFunction, HashScheme};
+use crate::hash::{Field, HashTable, HashNode, HashFunction, HashScheme, ExtendOption};
 
 // Compares the fields of two tuples using a predicate.
 pub struct JoinPredicate {
@@ -37,12 +37,14 @@ impl HashEqJoin {
         bucket_size: usize,
         func: HashFunction,
         sche: HashScheme,
+        h: usize,
+        op: ExtendOption,
     ) -> Self {
         Self {
             open: false,
             left_child: l_child,
             right_child: r_child,
-            join_hash_table: HashTable::new(bucket_size, bucket_number, func, sche),
+            join_hash_table: HashTable::new(bucket_size, bucket_number, func, sche, h, op),
             current_node: None,
             current_bucket: None,
         }
@@ -153,6 +155,8 @@ mod test_join {
             b_size,
             HashFunction::FarmHash,
             HashScheme::LinearProbe,
+            4,
+            ExtendOption::ExtendBucketSize,
         );
         assert_eq!(h_e_join.open, false);
         assert_eq!(h_e_join.left_child.len(), 4);
@@ -174,6 +178,8 @@ mod test_join {
             b_size,
             HashFunction::FarmHash,
             HashScheme::LinearProbe,
+            4,
+            ExtendOption::ExtendBucketSize,
         );
         let res_farm = h_e_join.join();
 
@@ -201,6 +207,8 @@ mod test_join {
             b_size,
             HashFunction::MurmurHash3,
             HashScheme::LinearProbe,
+            4,
+            ExtendOption::ExtendBucketSize,
         );
 
         let res_murmur = h_e_join.join();
@@ -228,6 +236,8 @@ mod test_join {
             b_size,
             HashFunction::StdHash,
             HashScheme::LinearProbe,
+            4,
+            ExtendOption::ExtendBucketSize,
         );
 
         let res_std = h_e_join.join();
@@ -256,6 +266,8 @@ mod test_join {
             b_size,
             HashFunction::T1haHash,
             HashScheme::LinearProbe,
+            4,
+            ExtendOption::ExtendBucketSize,
         );
 
         let res_t1ha = h_e_join.join();
