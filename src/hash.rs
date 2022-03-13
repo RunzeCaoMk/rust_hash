@@ -391,7 +391,8 @@ impl HashTable {
     }
 
     // method to use hopscotch hashing to insert
-    fn hopscotch_insert(&mut self, new_key: (Field, Field), new_value: usize, indexes: (usize, usize)) {
+    // return 0 if ok, 1 if need to resize
+    fn hopscotch_insert(&mut self, new_key: (Field, Field), new_value: usize, indexes: (usize, usize)){
         let bucket_index = indexes.0;
         let index = indexes.1;
         // look through neighborhood for empty space or same key
@@ -430,11 +431,12 @@ impl HashTable {
                                 }
                             }
                             // prepare to restart search for another swap
-                            if empty_index - (self.H - 1) > 0 {
-                                start_index = empty_index - (self.H - 1)
-                            } else {
-                                start_index = 0
-                            }
+                            // if empty_index - (self.H - 1) > 0 {
+                            //     start_index = empty_index - (self.H - 1)
+                            // } else {
+                            //     start_index = 0
+                            // }
+                            start_index = empty_index.checked_sub((self.H - 1)).unwrap_or(0);
 
                             if empty_index - index < self.H {
                                 // we are now within the neighborhood, so put new entry in empty space
@@ -450,6 +452,8 @@ impl HashTable {
                     }
                     // can't swap anything with empty space, need to resize
                     println!("Can't swap it into the neighborhood!");
+                    self.extend();
+                    self.insert(new_key.clone(), new_value);
                     break;
                 }
             }
@@ -462,7 +466,7 @@ impl HashTable {
     pub fn insert(&mut self, new_key: (Field, Field), new_value: usize) {
         // extent the hash table once reach the load limit
         for i in 0..self.BUCKET_NUMBER {
-            if self.BUCKET_SIZE * self.load_factor < self.taken_count[i] {
+            if (self.BUCKET_SIZE as f64 * self.load_factor).floor() as usize <= self.taken_count[i] {
                 self.extend();
                 self.insert(new_key.clone(), new_value);
             }
@@ -472,7 +476,7 @@ impl HashTable {
         if let Some(indexes) =
         self.get_indexes((&new_key.0, &new_key.1)){
             if self.scheme == HashScheme::Hopscotch { // using helper method to insert w/ hopscotch
-                self.hopscotch_insert(new_key, new_value, (indexes.0, indexes.1));
+                self.hopscotch_insert(new_key.clone(), new_value, (indexes.0, indexes.1));
             } else if self.buckets[indexes.0][indexes.1].key == new_key { // check if the the key is already existed in the table
                 // add new value to the old one
                 self.buckets[indexes.0][indexes.1].value += new_value;
@@ -493,7 +497,7 @@ impl HashTable {
     }
 
     // method to extend the bucket number / bucket size and then rehash the table
-    pub fn extend(&mut self) {
+    fn extend(&mut self) {
         assert!(self.buckets.len() > 0);
         let mut new_self = match self.extend_op {
             // extend the bucket size to twice of the original bucket size
@@ -544,6 +548,48 @@ impl HashTable {
 mod test_hash {
     use super::*;
 
+    // function to test extend
+    pub fn test_extend() {
+        let mut table = HashTable::new(
+            5,
+            1,
+            HashFunction::FarmHash,
+            HashScheme::LinearProbe,
+            4,
+            ExtendOption::ExtendBucketNumber,
+            0.9,
+        );
+
+        let name = Field::StringField(String::from("Adam"));
+        let course_taken = Field::IntField(0);
+        table.insert((name, course_taken), 1);
+
+        let name = Field::StringField(String::from("Ben"));
+        let course_taken = Field::IntField(1);
+        table.insert((name, course_taken), 1);
+
+        let name = Field::StringField(String::from("Chris"));
+        let course_taken = Field::IntField(1);
+        table.insert((name, course_taken), 1);
+
+        let name = Field::StringField(String::from("David"));
+        let course_taken = Field::IntField(1);
+        table.insert((name, course_taken), 1);
+
+        let name = Field::StringField(String::from("Elv"));
+        let course_taken = Field::IntField(1);
+        table.insert((name, course_taken), 1);
+
+        let name = Field::StringField(String::from("Frank"));
+        let course_taken = Field::IntField(1);
+        table.insert((name, course_taken), 1);
+
+        assert_eq!(4, table.taken_count[0]);
+        assert_eq!(2, table.taken_count[1]);
+        assert_eq!(5, table.BUCKET_SIZE);
+        assert_eq!(2, table.BUCKET_NUMBER);
+    }
+
     // function to test hopscotch
     pub fn test_hopscotch() {
         let mut table = HashTable::new(
@@ -558,16 +604,16 @@ mod test_hash {
         table.buckets[0][0].taken = true;
         table.buckets[0][1].taken = true;
         table.buckets[0][3].taken = true;
-        table.hop_info[3] = 4;
+        table.hop_info[3] = 4; // 0100
         table.buckets[0][4].taken = true;
         table.buckets[0][5].taken = true;
-        table.hop_info[5] = 10;
+        table.hop_info[5] = 10; // 1010
         table.buckets[0][6].taken = true;
         table.buckets[0][7].taken = true;
-        table.hop_info[7] = 4;
+        table.hop_info[7] = 4; // 0100
         table.buckets[0][8].taken = true;
         table.buckets[0][9].taken = true;
-        table.hop_info[9] = 4;
+        table.hop_info[9] = 4; // 0100
         table.buckets[0][10].taken = true;
         table.buckets[0][11].taken = true;
         table.taken_count[0] = 11;
@@ -899,40 +945,6 @@ mod test_hash {
         assert_eq!(1, table.taken_count[indexes1.0]);
     }
 
-    // function to test extend
-    pub fn test_extend() {
-        let mut table = HashTable::new(
-            10,
-            1,
-            HashFunction::FarmHash,
-            HashScheme::LinearProbe,
-            4,
-            ExtendOption::ExtendBucketNumber,
-            0.9,
-        );
-        let name1 = Field::StringField(String::from("Mark"));
-        let course_taken1 = Field::IntField(6);
-        table.insert((name1, course_taken1), 1);
-        assert_eq!(1, table.taken_count[0]);
-
-        table.extend();
-        assert_eq!(2, table.buckets.len());
-        assert_eq!(2, table.BUCKET_NUMBER);
-        assert_eq!(1, table.taken_count[1]);
-
-        let name1 = Field::StringField(String::from("Jenny"));
-        let course_taken1 = Field::IntField(12);
-        table.insert((name1, course_taken1), 1);
-
-        table.extend_op = ExtendOption::ExtendBucketSize;
-        table.extend();
-        assert_eq!(20, table.buckets[0].len());
-        assert_eq!(20, table.buckets[1].len());
-        // assert_eq!(20, table.buckets[2].len());
-        // assert_eq!(20, table.buckets[3].len());
-        assert_eq!(20, table.BUCKET_SIZE);
-    }
-
     // function to test robin_hood
     pub fn test_robin_hood() {
         let mut table = HashTable::new(
@@ -992,6 +1004,11 @@ mod test_hash {
         use super::*;
 
         #[test]
+        fn t_extend() {
+            test_extend();
+        }
+
+        #[test]
         fn t_hopscotch() {
             test_hopscotch();
         }
@@ -1004,11 +1021,6 @@ mod test_hash {
         #[test]
         fn t_robin_hood() {
             test_robin_hood();
-        }
-
-        #[test]
-        fn t_extend() {
-            test_extend();
         }
 
         #[test]

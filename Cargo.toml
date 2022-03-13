@@ -10,3 +10,4 @@ serde = { version = "1", features = ["derive"] }
 farmhash = "1.1.5"
 t1ha = "0.1.0"
 mur3 = "0.1.0"
+rand = "0.8.5"
