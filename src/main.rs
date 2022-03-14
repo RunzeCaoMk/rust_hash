@@ -6,7 +6,8 @@ use std::fs::File;
 use std::io::LineWriter;
 use std::io::prelude::*;
 
-fn create_vec_tuple(tuple_number: usize) -> Vec<(Field, Field)> {
+// function to creat number of tuples for benchmark
+pub fn create_vec_tuple(tuple_number: usize) -> Vec<(Field, Field)> {
     let mut tuples = Vec::new();
     for _ in 0..tuple_number {
         // create a random string as "name" attribute
@@ -105,7 +106,7 @@ fn c_5(mut file: &File) {
     //     100,
     //     HashFunction::FarmHash,
     //     HashScheme::Hopscotch,
-    //     64,
+    //     10,
     //     ExtendOption::ExtendBucketSize,
     //     0.9,
     // );
@@ -122,7 +123,7 @@ fn c_5(mut file: &File) {
     //     100,
     //     HashFunction::MurmurHash3,
     //     HashScheme::Hopscotch,
-    //     64,
+    //     10,
     //     ExtendOption::ExtendBucketSize,
     //     0.9,
     // );
@@ -139,7 +140,7 @@ fn c_5(mut file: &File) {
     //     100,
     //     HashFunction::StdHash,
     //     HashScheme::Hopscotch,
-    //     64,
+    //     10,
     //     ExtendOption::ExtendBucketSize,
     //     0.9,
     // );
@@ -156,7 +157,7 @@ fn c_5(mut file: &File) {
     //     100,
     //     HashFunction::T1haHash,
     //     HashScheme::Hopscotch,
-    //     64,
+    //     10,
     //     ExtendOption::ExtendBucketSize,
     //     0.9,
     // );
@@ -664,7 +665,7 @@ fn cardinality(mut file: &File) {
     file.write_all("Micro-benchmark with different cardinality\n".as_ref());
     c_5(file);
     c_100(file);
-    c_500(file);
+    // c_500(file);
 }
 
 // helper method to benchmark extend bucket number
@@ -676,8 +677,8 @@ fn eo_b_number(mut file: &File) {
     let mut linear_farm_join = HashEqJoin::new(
         left_child.clone(),
         right_child.clone(),
-        1000,
         100,
+        1000,
         HashFunction::FarmHash,
         HashScheme::LinearProbe,
         4,
@@ -693,8 +694,8 @@ fn eo_b_number(mut file: &File) {
     let mut linear_murmur_join = HashEqJoin::new(
         left_child.clone(),
         right_child.clone(),
-        1000,
         100,
+        1000,
         HashFunction::MurmurHash3,
         HashScheme::LinearProbe,
         4,
@@ -710,8 +711,8 @@ fn eo_b_number(mut file: &File) {
     let mut linear_std_join = HashEqJoin::new(
         left_child.clone(),
         right_child.clone(),
-        1000,
         100,
+        1000,
         HashFunction::StdHash,
         HashScheme::LinearProbe,
         4,
@@ -727,8 +728,8 @@ fn eo_b_number(mut file: &File) {
     let mut linear_t1ha_join = HashEqJoin::new(
         left_child.clone(),
         right_child.clone(),
-        1000,
         100,
+        1000,
         HashFunction::T1haHash,
         HashScheme::LinearProbe,
         4,
@@ -745,8 +746,8 @@ fn eo_b_number(mut file: &File) {
     // let mut hopscotch_farm_join = HashEqJoin::new(
     //     left_child.clone(),
     //     right_child.clone(),
-    //     1000,
     //     100,
+    //     1000,
     //     HashFunction::FarmHash,
     //     HashScheme::Hopscotch,
     //     64,
@@ -762,8 +763,8 @@ fn eo_b_number(mut file: &File) {
     // let mut hopscotch_murmur_join = HashEqJoin::new(
     //     left_child.clone(),
     //     right_child.clone(),
-    //     1000,
     //     100,
+    //     1000,
     //     HashFunction::MurmurHash3,
     //     HashScheme::Hopscotch,
     //     64,
@@ -779,8 +780,8 @@ fn eo_b_number(mut file: &File) {
     // let mut hopscotch_std_join = HashEqJoin::new(
     //     left_child.clone(),
     //     right_child.clone(),
-    //     1000,
     //     100,
+    //     1000,
     //     HashFunction::StdHash,
     //     HashScheme::Hopscotch,
     //     64,
@@ -796,8 +797,8 @@ fn eo_b_number(mut file: &File) {
     // let mut hopscotch_t1ha_join = HashEqJoin::new(
     //     left_child.clone(),
     //     right_child.clone(),
-    //     1000,
     //     100,
+    //     1000,
     //     HashFunction::T1haHash,
     //     HashScheme::Hopscotch,
     //     64,
@@ -814,8 +815,8 @@ fn eo_b_number(mut file: &File) {
     let mut RobinHood_farm_join = HashEqJoin::new(
         left_child.clone(),
         right_child.clone(),
-        1000,
         100,
+        1000,
         HashFunction::FarmHash,
         HashScheme::RobinHood,
         4,
@@ -831,8 +832,8 @@ fn eo_b_number(mut file: &File) {
     let mut RobinHood_murmur_join = HashEqJoin::new(
         left_child.clone(),
         right_child.clone(),
-        1000,
         100,
+        1000,
         HashFunction::MurmurHash3,
         HashScheme::RobinHood,
         4,
@@ -848,8 +849,8 @@ fn eo_b_number(mut file: &File) {
     let mut RobinHood_std_join = HashEqJoin::new(
         left_child.clone(),
         right_child.clone(),
-        1000,
         100,
+        1000,
         HashFunction::StdHash,
         HashScheme::RobinHood,
         4,
@@ -865,8 +866,8 @@ fn eo_b_number(mut file: &File) {
     let mut RobinHood_t1ha_join = HashEqJoin::new(
         left_child.clone(),
         right_child.clone(),
-        1000,
         100,
+        1000,
         HashFunction::T1haHash,
         HashScheme::RobinHood,
         4,
@@ -1311,7 +1312,7 @@ fn lf_07(mut file: &File) {
 }
 // helper method to benchmark load factor 1.0
 fn lf_10(mut file: &File) {
-    file.write_all("0.5:\n".as_ref());
+    file.write_all("1.0:\n".as_ref());
     let left_child = create_vec_tuple(50000);
     let right_child = create_vec_tuple(50000);
     // Linear Probe
@@ -1531,7 +1532,7 @@ fn load_factor(mut file: &File) {
 
 // helper method to benchmark b_number 200 * b_size 500
 fn sn_200_500(mut file: &File) {
-    file.write_all("500 bucket size * 200 bucket number:\n".as_ref());
+    file.write_all("200 buckets * 500 slots/bucket:\n".as_ref());
     let left_child = create_vec_tuple(50000);
     let right_child = create_vec_tuple(50000);
     // Linear Probe
@@ -1743,7 +1744,7 @@ fn sn_200_500(mut file: &File) {
 }
 // helper method to benchmark b_number 100 * b_size 1000
 fn sn_100_1000(mut file: &File) {
-    file.write_all("500 bucket size * 200 bucket number:\n".as_ref());
+    file.write_all("100 buckets * 1000 slots/bucket:\n".as_ref());
     let left_child = create_vec_tuple(50000);
     let right_child = create_vec_tuple(50000);
     // Linear Probe
@@ -1961,9 +1962,9 @@ fn size_number(mut file: &File) {
 }
 
 fn main() {
-    let mut file = File::create("res.txt").unwrap();
-    cardinality(&file);
+    let mut file = File::create("res2.txt").unwrap();
+    // cardinality(&file);
     extend_option(&file);
-    load_factor(&file);
-    size_number(&file);
+    // load_factor(&file);
+    // size_number(&file);
 }

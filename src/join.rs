@@ -128,10 +128,12 @@ impl OpIterator for HashEqJoin {
 
 #[cfg(test)]
 mod test_join {
+    use rand::distributions::Alphanumeric;
+    use rand::Rng;
     use super::*;
 
     /// Creates a Vec of (StringField, StringField) given a Vec of (&str, &str) 's
-    pub fn create_vec_tuple(tuple_data: Vec<(&str, &str)>) -> Vec<(Field, Field)> {
+    fn create_vec_tuple(tuple_data: Vec<(&str, &str)>) -> Vec<(Field, Field)> {
         let mut tuples = Vec::new();
         for item in &tuple_data {
             let fields = (Field::StringField((*item.0).parse().unwrap()),
@@ -141,8 +143,25 @@ mod test_join {
         tuples
     }
 
+    pub fn create_vec_tuple1(tuple_number: usize) -> Vec<(Field, Field)> {
+        let mut tuples = Vec::new();
+        for _ in 0..tuple_number {
+            // create a random string as "name" attribute
+            let s: String = rand::thread_rng()
+                .sample_iter(&Alphanumeric)
+                .take(7)
+                .map(char::from)
+                .collect();
+            // use fixed "CS" as "department"
+            let fields = (Field::StringField(String::from("CS")),
+                          Field::StringField(s));
+            tuples.push(fields);
+        }
+        tuples
+    }
+
     // function to test initialize a HashEqJoin
-    pub fn test_new() {
+    fn test_new() {
         let l_child = create_vec_tuple(
             vec![("CS", "Adam"), ("CS", "Ben"), ("CS", "Chris"), ("CS", "David")]);
         let r_child = create_vec_tuple(
@@ -166,7 +185,7 @@ mod test_join {
     }
 
     // function to test join a HashEqJoin using FarmHash
-    pub fn test_join_farm() {
+    fn test_join_farm() {
         let l_child = create_vec_tuple(
             vec![("CS", "Adam"), ("CS", "Ben"), ("CS", "Chris"), ("CS", "David")]);
         let r_child = create_vec_tuple(
@@ -196,7 +215,7 @@ mod test_join {
     }
 
     // function to test join a HashEqJoin using MurmurHash3
-    pub fn test_join_murmur3() {
+    fn test_join_murmur3() {
         let l_child = create_vec_tuple(
             vec![("CS", "Adam"), ("CS", "Ben"), ("CS", "Chris"), ("CS", "David")]);
         let r_child = create_vec_tuple(
@@ -226,7 +245,7 @@ mod test_join {
     }
 
     // function to test join a HashEqJoin using std::hash
-    pub fn test_join_std() {
+    fn test_join_std() {
         let l_child = create_vec_tuple(
             vec![("CS", "Adam"), ("CS", "Ben"), ("CS", "Chris"), ("CS", "David")]);
         let r_child = create_vec_tuple(
@@ -257,7 +276,7 @@ mod test_join {
     }
 
     // function to test join a HashEqJoin using T1haHash
-    pub fn test_join_t1ha() {
+    fn test_join_t1ha() {
         let l_child = create_vec_tuple(
             vec![("CS", "Adam"), ("CS", "Ben"), ("CS", "Chris"), ("CS", "David")]);
         let r_child = create_vec_tuple(
@@ -286,8 +305,31 @@ mod test_join {
         assert_eq!(res_t1ha[2], (dep.clone(), Field::StringField(String::from("Chris"))));
     }
 
+    // function to test join a HashEqJoin using hopscotch
+    fn test_hopscotch() {
+        let left_child = create_vec_tuple1(2500);
+        let right_child = create_vec_tuple1(2500);
+        let mut hopscotch_farm_join = HashEqJoin::new(
+            left_child,
+            right_child,
+            1000,
+            100,
+            HashFunction::FarmHash,
+            HashScheme::Hopscotch,
+            10,
+            ExtendOption::ExtendBucketSize,
+            1.0,
+        );
+        hopscotch_farm_join.join();
+    }
+
     mod join {
         use super::*;
+
+        #[test]
+        fn t_hop() {
+            test_hopscotch();
+        }
 
         #[test]
         fn t_new() {
