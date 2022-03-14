@@ -669,7 +669,7 @@ fn c_64m(mut file: &File) {
     let mut linear_farm_join = HashEqJoin::new(
         left_child.clone(),
         right_child.clone(),
-        320000,
+        640000,
         100,
         HashFunction::FarmHash,
         HashScheme::LinearProbe,
@@ -686,7 +686,7 @@ fn c_64m(mut file: &File) {
     let mut linear_murmur_join = HashEqJoin::new(
         left_child.clone(),
         right_child.clone(),
-        320000,
+        640000,
         100,
         HashFunction::MurmurHash3,
         HashScheme::LinearProbe,
@@ -703,7 +703,7 @@ fn c_64m(mut file: &File) {
     let mut linear_std_join = HashEqJoin::new(
         left_child.clone(),
         right_child.clone(),
-        320000,
+        640000,
         100,
         HashFunction::StdHash,
         HashScheme::LinearProbe,
@@ -720,7 +720,7 @@ fn c_64m(mut file: &File) {
     let mut linear_t1ha_join = HashEqJoin::new(
         left_child.clone(),
         right_child.clone(),
-        320000,
+        640000,
         100,
         HashFunction::T1haHash,
         HashScheme::LinearProbe,
@@ -738,7 +738,7 @@ fn c_64m(mut file: &File) {
     // let mut hopscotch_farm_join = HashEqJoin::new(
     //     left_child.clone(),
     //     right_child.clone(),
-    //     320000,
+    //     640000,
     //     100,
     //     HashFunction::FarmHash,
     //     HashScheme::Hopscotch,
@@ -755,7 +755,7 @@ fn c_64m(mut file: &File) {
     // let mut hopscotch_murmur_join = HashEqJoin::new(
     //     left_child.clone(),
     //     right_child.clone(),
-    //     320000,
+    //     640000,
     //     100,
     //     HashFunction::MurmurHash3,
     //     HashScheme::Hopscotch,
@@ -772,7 +772,7 @@ fn c_64m(mut file: &File) {
     // let mut hopscotch_std_join = HashEqJoin::new(
     //     left_child.clone(),
     //     right_child.clone(),
-    //     320000,
+    //     640000,
     //     100,
     //     HashFunction::StdHash,
     //     HashScheme::Hopscotch,
@@ -789,7 +789,7 @@ fn c_64m(mut file: &File) {
     // let mut hopscotch_t1ha_join = HashEqJoin::new(
     //     left_child.clone(),
     //     right_child.clone(),
-    //     320000,
+    //     640000,
     //     100,
     //     HashFunction::T1haHash,
     //     HashScheme::Hopscotch,
@@ -807,7 +807,7 @@ fn c_64m(mut file: &File) {
     let mut RobinHood_farm_join = HashEqJoin::new(
         left_child.clone(),
         right_child.clone(),
-        320000,
+        640000,
         100,
         HashFunction::FarmHash,
         HashScheme::RobinHood,
@@ -824,7 +824,7 @@ fn c_64m(mut file: &File) {
     let mut RobinHood_murmur_join = HashEqJoin::new(
         left_child.clone(),
         right_child.clone(),
-        320000,
+        640000,
         100,
         HashFunction::MurmurHash3,
         HashScheme::RobinHood,
@@ -841,7 +841,7 @@ fn c_64m(mut file: &File) {
     let mut RobinHood_std_join = HashEqJoin::new(
         left_child.clone(),
         right_child.clone(),
-        320000,
+        640000,
         100,
         HashFunction::StdHash,
         HashScheme::RobinHood,
@@ -858,7 +858,7 @@ fn c_64m(mut file: &File) {
     let mut RobinHood_t1ha_join = HashEqJoin::new(
         left_child.clone(),
         right_child.clone(),
-        320000,
+        640000,
         100,
         HashFunction::T1haHash,
         HashScheme::RobinHood,
@@ -875,8 +875,8 @@ fn c_64m(mut file: &File) {
 // method to benchmark different cardinality with 12 permutations
 fn cardinality(mut file: &File) {
     file.write_all("Micro-benchmark with different cardinality\n".as_ref());
-    c_5k(file);
-    c_100k(file);
+    // c_5k(file);
+    // c_100k(file);
     c_1m(file);
     c_64m(file);
 }
