@@ -453,7 +453,7 @@ fn c_500k(mut file: &File) {
     file.write_all("500k:\n".as_ref());
     let left_child = create_vec_tuple(250000);
     let right_child = create_vec_tuple(250000);
-    // // Linear Probe
+    // Linear Probe
     // let mut linear_farm_join = HashEqJoin::new(
     //     left_child.clone(),
     //     right_child.clone(),
