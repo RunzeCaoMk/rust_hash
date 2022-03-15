@@ -448,16 +448,16 @@ fn c_100k(mut file: &File) {
     file.write_all(now.elapsed().as_secs_f64().to_string().as_ref());
     file.write_all("\n".as_ref());
 }
-// helper method to benchmark 1M tuples
-fn c_1m(mut file: &File) {
+// helper method to benchmark 500k tuples
+fn c_500k(mut file: &File) {
     file.write_all("1M:\n".as_ref());
-    let left_child = create_vec_tuple(500000);
-    let right_child = create_vec_tuple(500000);
+    let left_child = create_vec_tuple(250000);
+    let right_child = create_vec_tuple(250000);
     // Linear Probe
     let mut linear_farm_join = HashEqJoin::new(
         left_child.clone(),
         right_child.clone(),
-        10000,
+        5000,
         100,
         HashFunction::FarmHash,
         HashScheme::LinearProbe,
@@ -474,7 +474,7 @@ fn c_1m(mut file: &File) {
     let mut linear_murmur_join = HashEqJoin::new(
         left_child.clone(),
         right_child.clone(),
-        10000,
+        5000,
         100,
         HashFunction::MurmurHash3,
         HashScheme::LinearProbe,
@@ -491,7 +491,7 @@ fn c_1m(mut file: &File) {
     let mut linear_std_join = HashEqJoin::new(
         left_child.clone(),
         right_child.clone(),
-        10000,
+        5000,
         100,
         HashFunction::StdHash,
         HashScheme::LinearProbe,
@@ -508,7 +508,7 @@ fn c_1m(mut file: &File) {
     let mut linear_t1ha_join = HashEqJoin::new(
         left_child.clone(),
         right_child.clone(),
-        10000,
+        5000,
         100,
         HashFunction::T1haHash,
         HashScheme::LinearProbe,
@@ -526,7 +526,7 @@ fn c_1m(mut file: &File) {
     // let mut hopscotch_farm_join = HashEqJoin::new(
     //     left_child.clone(),
     //     right_child.clone(),
-    //     10000,
+    //     5000,
     //     100,
     //     HashFunction::FarmHash,
     //     HashScheme::Hopscotch,
@@ -543,7 +543,7 @@ fn c_1m(mut file: &File) {
     // let mut hopscotch_murmur_join = HashEqJoin::new(
     //     left_child.clone(),
     //     right_child.clone(),
-    //     10000,
+    //     5000,
     //     100,
     //     HashFunction::MurmurHash3,
     //     HashScheme::Hopscotch,
@@ -560,7 +560,7 @@ fn c_1m(mut file: &File) {
     // let mut hopscotch_std_join = HashEqJoin::new(
     //     left_child.clone(),
     //     right_child.clone(),
-    //     10000,
+    //     5000,
     //     100,
     //     HashFunction::StdHash,
     //     HashScheme::Hopscotch,
@@ -577,7 +577,7 @@ fn c_1m(mut file: &File) {
     // let mut hopscotch_t1ha_join = HashEqJoin::new(
     //     left_child.clone(),
     //     right_child.clone(),
-    //     10000,
+    //     5000,
     //     100,
     //     HashFunction::T1haHash,
     //     HashScheme::Hopscotch,
@@ -595,7 +595,7 @@ fn c_1m(mut file: &File) {
     let mut RobinHood_farm_join = HashEqJoin::new(
         left_child.clone(),
         right_child.clone(),
-        10000,
+        5000,
         100,
         HashFunction::FarmHash,
         HashScheme::RobinHood,
@@ -612,7 +612,7 @@ fn c_1m(mut file: &File) {
     let mut RobinHood_murmur_join = HashEqJoin::new(
         left_child.clone(),
         right_child.clone(),
-        10000,
+        5000,
         100,
         HashFunction::MurmurHash3,
         HashScheme::RobinHood,
@@ -629,7 +629,7 @@ fn c_1m(mut file: &File) {
     let mut RobinHood_std_join = HashEqJoin::new(
         left_child.clone(),
         right_child.clone(),
-        10000,
+        5000,
         100,
         HashFunction::StdHash,
         HashScheme::RobinHood,
@@ -646,219 +646,7 @@ fn c_1m(mut file: &File) {
     let mut RobinHood_t1ha_join = HashEqJoin::new(
         left_child.clone(),
         right_child.clone(),
-        10000,
-        100,
-        HashFunction::T1haHash,
-        HashScheme::RobinHood,
-        4,
-        ExtendOption::ExtendBucketSize,
-        0.9,
-    );
-    file.write_all("RobinHood + T1ha Hash:\n".as_ref());
-    let now = Instant::now();
-    RobinHood_t1ha_join.join();
-    file.write_all(now.elapsed().as_secs_f64().to_string().as_ref());
-    file.write_all("\n".as_ref());
-}
-// helper method to benchmark 1M tuples
-fn c_64m(mut file: &File) {
-    file.write_all("64M:\n".as_ref());
-    let left_child = create_vec_tuple(32000000);
-    let right_child = create_vec_tuple(32000000);
-    // Linear Probe
-    let mut linear_farm_join = HashEqJoin::new(
-        left_child.clone(),
-        right_child.clone(),
-        640000,
-        100,
-        HashFunction::FarmHash,
-        HashScheme::LinearProbe,
-        4,
-        ExtendOption::ExtendBucketSize,
-        0.9,
-    );
-    file.write_all("Linear Probe + Farm Hash:\n".as_ref());
-    let now = Instant::now();
-    linear_farm_join.join();
-    file.write_all(now.elapsed().as_secs_f64().to_string().as_ref());
-    file.write_all("\n".as_ref());
-
-    let mut linear_murmur_join = HashEqJoin::new(
-        left_child.clone(),
-        right_child.clone(),
-        640000,
-        100,
-        HashFunction::MurmurHash3,
-        HashScheme::LinearProbe,
-        4,
-        ExtendOption::ExtendBucketSize,
-        0.9,
-    );
-    file.write_all("Linear Probe + Murmur Hash 3:\n".as_ref());
-    let now = Instant::now();
-    linear_murmur_join.join();
-    file.write_all(now.elapsed().as_secs_f64().to_string().as_ref());
-    file.write_all("\n".as_ref());
-
-    let mut linear_std_join = HashEqJoin::new(
-        left_child.clone(),
-        right_child.clone(),
-        640000,
-        100,
-        HashFunction::StdHash,
-        HashScheme::LinearProbe,
-        4,
-        ExtendOption::ExtendBucketSize,
-        0.9,
-    );
-    file.write_all("Linear Probe + std Hash:\n".as_ref());
-    let now = Instant::now();
-    linear_std_join.join();
-    file.write_all(now.elapsed().as_secs_f64().to_string().as_ref());
-    file.write_all("\n".as_ref());
-
-    let mut linear_t1ha_join = HashEqJoin::new(
-        left_child.clone(),
-        right_child.clone(),
-        640000,
-        100,
-        HashFunction::T1haHash,
-        HashScheme::LinearProbe,
-        4,
-        ExtendOption::ExtendBucketSize,
-        0.9,
-    );
-    file.write_all("Linear Probe + T1ha Hash:\n".as_ref());
-    let now = Instant::now();
-    linear_t1ha_join.join();
-    file.write_all(now.elapsed().as_secs_f64().to_string().as_ref());
-    file.write_all("\n".as_ref());
-
-    // // Hopscotch
-    // let mut hopscotch_farm_join = HashEqJoin::new(
-    //     left_child.clone(),
-    //     right_child.clone(),
-    //     640000,
-    //     100,
-    //     HashFunction::FarmHash,
-    //     HashScheme::Hopscotch,
-    //     64,
-    //     ExtendOption::ExtendBucketSize,
-    //     0.9,
-    // );
-    // file.write_all("Hopscotch + Farm Hash:\n".as_ref());
-    // let now = Instant::now();
-    // hopscotch_farm_join.join();
-    // file.write_all(now.elapsed().as_secs_f64().to_string().as_ref());
-    // file.write_all("\n".as_ref());
-
-    // let mut hopscotch_murmur_join = HashEqJoin::new(
-    //     left_child.clone(),
-    //     right_child.clone(),
-    //     640000,
-    //     100,
-    //     HashFunction::MurmurHash3,
-    //     HashScheme::Hopscotch,
-    //     64,
-    //     ExtendOption::ExtendBucketSize,
-    //     0.9,
-    // );
-    // file.write_all("Hopscotch + Murmur Hash 3:\n".as_ref());
-    // let now = Instant::now();
-    // hopscotch_murmur_join.join();
-    // file.write_all(now.elapsed().as_secs_f64().to_string().as_ref());
-    // file.write_all("\n".as_ref());
-    //
-    // let mut hopscotch_std_join = HashEqJoin::new(
-    //     left_child.clone(),
-    //     right_child.clone(),
-    //     640000,
-    //     100,
-    //     HashFunction::StdHash,
-    //     HashScheme::Hopscotch,
-    //     64,
-    //     ExtendOption::ExtendBucketSize,
-    //     0.9,
-    // );
-    // file.write_all("Hopscotch + std Hash:\n".as_ref());
-    // let now = Instant::now();
-    // hopscotch_std_join.join();
-    // file.write_all(now.elapsed().as_secs_f64().to_string().as_ref());
-    // file.write_all("\n".as_ref());
-    //
-    // let mut hopscotch_t1ha_join = HashEqJoin::new(
-    //     left_child.clone(),
-    //     right_child.clone(),
-    //     640000,
-    //     100,
-    //     HashFunction::T1haHash,
-    //     HashScheme::Hopscotch,
-    //     64,
-    //     ExtendOption::ExtendBucketSize,
-    //     0.9,
-    // );
-    // file.write_all("Hopscotch + T1ha Hash:\n".as_ref());
-    // let now = Instant::now();
-    // hopscotch_t1ha_join.join();
-    // file.write_all(now.elapsed().as_secs_f64().to_string().as_ref());
-    // file.write_all("\n".as_ref());
-
-    // Robin hood
-    let mut RobinHood_farm_join = HashEqJoin::new(
-        left_child.clone(),
-        right_child.clone(),
-        640000,
-        100,
-        HashFunction::FarmHash,
-        HashScheme::RobinHood,
-        4,
-        ExtendOption::ExtendBucketSize,
-        0.9,
-    );
-    file.write_all("RobinHood + Farm Hash:\n".as_ref());
-    let now = Instant::now();
-    RobinHood_farm_join.join();
-    file.write_all(now.elapsed().as_secs_f64().to_string().as_ref());
-    file.write_all("\n".as_ref());
-
-    let mut RobinHood_murmur_join = HashEqJoin::new(
-        left_child.clone(),
-        right_child.clone(),
-        640000,
-        100,
-        HashFunction::MurmurHash3,
-        HashScheme::RobinHood,
-        4,
-        ExtendOption::ExtendBucketSize,
-        0.9,
-    );
-    file.write_all("RobinHood + Murmur Hash 3:\n".as_ref());
-    let now = Instant::now();
-    RobinHood_murmur_join.join();
-    file.write_all(now.elapsed().as_secs_f64().to_string().as_ref());
-    file.write_all("\n".as_ref());
-
-    let mut RobinHood_std_join = HashEqJoin::new(
-        left_child.clone(),
-        right_child.clone(),
-        640000,
-        100,
-        HashFunction::StdHash,
-        HashScheme::RobinHood,
-        4,
-        ExtendOption::ExtendBucketSize,
-        0.9,
-    );
-    file.write_all("RobinHood + std Hash:\n".as_ref());
-    let now = Instant::now();
-    RobinHood_std_join.join();
-    file.write_all(now.elapsed().as_secs_f64().to_string().as_ref());
-    file.write_all("\n".as_ref());
-
-    let mut RobinHood_t1ha_join = HashEqJoin::new(
-        left_child.clone(),
-        right_child.clone(),
-        640000,
+        5000,
         100,
         HashFunction::T1haHash,
         HashScheme::RobinHood,
@@ -877,8 +665,7 @@ fn cardinality(mut file: &File) {
     file.write_all("Micro-benchmark with different cardinality\n".as_ref());
     // c_5k(file);
     // c_100k(file);
-    c_1m(file);
-    c_64m(file);
+    c_500k(file);
 }
 
 // helper method to benchmark extend bucket number
@@ -2180,4 +1967,5 @@ fn main() {
     // extend_option(&file);
     // load_factor(&file);
     // size_number(&file);
+
 }
