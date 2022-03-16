@@ -2388,7 +2388,7 @@ fn kl_20(mut file: &File) {
 }
 // helper method to benchmark key length 100
 fn kl_100(mut file: &File) {
-    file.write_all("20 key length:\n".as_ref());
+    file.write_all("100 key length:\n".as_ref());
     let left_child = create_vec_tuple(50000, 100);
     let right_child = create_vec_tuple(50000, 100);
     // Linear Probe
@@ -2600,7 +2600,7 @@ fn kl_100(mut file: &File) {
 }
 // helper method to benchmark key length 500
 fn kl_500(mut file: &File) {
-    file.write_all("20 key length:\n".as_ref());
+    file.write_all("500 key length:\n".as_ref());
     let left_child = create_vec_tuple(50000, 500);
     let right_child = create_vec_tuple(50000, 500);
     // Linear Probe
@@ -2815,7 +2815,7 @@ fn key_length(mut file: &File) {
     file.write_all("Micro-benchmark with different key length\n".as_ref());
     kl_20(file);
     kl_100(file);
-    // kl_500(file);
+    kl_500(file);
 }
 
 fn main() {
