@@ -134,7 +134,7 @@ impl Default for Field {
 }
 
 /// Different types of hash functions
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum HashFunction {
     FarmHash,
     MurmurHash3,
@@ -324,16 +324,16 @@ impl HashTable {
         // using different hash functions to get the index in one bucket
         let mut index = match self.function {
             HashFunction::FarmHash => {
-                (key.0.farm_hash() % 10 + key.1.farm_hash() % 10) % self.BUCKET_SIZE
+                (key.0.farm_hash() / 10 + key.1.farm_hash() / 100) % self.BUCKET_SIZE
             },
             HashFunction::MurmurHash3 => {
-                (key.0.murmur_hash3() % 10 + key.1.murmur_hash3() % 10) % self.BUCKET_SIZE
+                (key.0.murmur_hash3() / 10 + key.1.murmur_hash3() / 100) % self.BUCKET_SIZE
             },
             HashFunction::T1haHash => {
-                (key.0.t1ha_hash() % 10 + key.1.t1ha_hash() % 10) % self.BUCKET_SIZE
+                (key.0.t1ha_hash() / 10 + key.1.t1ha_hash() / 100) % self.BUCKET_SIZE
             },
             HashFunction::StdHash => {
-                (key.0.std_hash() % 10 + key.1.std_hash() % 10) % self.BUCKET_SIZE
+                (key.0.std_hash() / 10 + key.1.std_hash() / 100) % self.BUCKET_SIZE
             },
         };
 
@@ -346,6 +346,7 @@ impl HashTable {
                     index = self.linear_probe(key, bucket_index, index).unwrap();
                 },
                 HashScheme::Hopscotch => {
+                    // println!("{}", index);
                     return Some((bucket_index, index, dis));
                 },
                 HashScheme::RobinHood => {
@@ -383,10 +384,25 @@ impl HashTable {
     // method to get the value
     pub fn get_value(&mut self, key: (&Field, &Field)) -> Option<&usize> {
         if let Some(indexes) = self.get_indexes(key) {
-            Some(&self.buckets[indexes.0][indexes.1].value)
+            if self.scheme == HashScheme::Hopscotch {
+                // check th hop info
+                for n in (0..self.H).rev() {
+                    // loop through the slots base on the hop
+                    if (self.hop_info[indexes.0][indexes.1] & (1 << n as usize)) != 0 {
+                        // compare the key
+                        if &self.buckets[indexes.0][indexes.1 + (self.H - 1 - n)].key.0 != key.0 &&
+                            &self.buckets[indexes.0][indexes.1 + (self.H - 1 - n)].key.1 != key.1 {
+                            return Some(&self.buckets[indexes.0][indexes.1  + (self.H - 1 - n)].value);
+                        }
+                    }
+                }
+                return None;
+            } else {
+                return Some(&self.buckets[indexes.0][indexes.1].value);
+            }
         } else {
             println!("Couldn't get value");
-            None
+            return None;
         }
     }
 
@@ -395,13 +411,22 @@ impl HashTable {
     fn hopscotch_insert(&mut self, new_key: (Field, Field), new_value: usize, indexes: (usize, usize)){
         let bucket_index = indexes.0;
         let index = indexes.1;
+        let mut empty = false;
+        // hop is full
+        if self.hop_info[bucket_index][index] >= self.H.pow(2) {
+            println!("No available swaps");
+            self.extend();
+            self.insert(new_key.clone(), new_value);
+            return
+        }
+
         // look through neighborhood for empty space or same key
         let end_of_H = std::cmp::min(index + self.H, self.BUCKET_SIZE);
         for i in index..end_of_H {
             if self.buckets[bucket_index][i].taken == false {  // slot is empty, insert the node
                 // put entry in empty space
                 self.buckets[bucket_index][i] = HashNode { key: new_key.clone(), value: new_value, taken: true, dis: 0};
-                self.hop_info[bucket_index][index] |= 1 << (self.H - 1 - (i - index));
+                self.hop_info[bucket_index][index] |= 0b_1 << (self.H - 1 - (i - index));
                 self.taken_count[bucket_index] += 1;
                 return
             } else if self.buckets[bucket_index][i].key == new_key { // same key, then update value
@@ -417,25 +442,31 @@ impl HashTable {
                 let mut start_index = empty_index - (self.H - 1);
                 'inner: loop {
                     for candidate_index in start_index..(start_index + self.H) {
-                        // some slot in
                         if self.hop_info[bucket_index][candidate_index] > 0 {
+                            // check every digit in H
                             for n in (0..self.H).rev() {
                                 if (self.hop_info[bucket_index][candidate_index] & (1 << n as usize)) != 0 {
+                                    // no available slot before the empty
+                                    if candidate_index + (self.H - 1 - n) >= empty_index {
+                                        println!("No available swaps");
+                                        self.extend();
+                                        self.insert(new_key.clone(), new_value);
+                                        return
+                                    }
                                     // swap the target with empty slot
                                     self.buckets[bucket_index][empty_index] = self.buckets[bucket_index][candidate_index + (self.H - 1 - n)].clone();
+                                    self.buckets[bucket_index][empty_index].taken = true;
                                     self.buckets[bucket_index][candidate_index + (self.H - 1 - n)] = HashNode::default();
                                     self.hop_info[bucket_index][candidate_index] -= usize::pow(2, n as u32);
-                                    self.hop_info[bucket_index][candidate_index] |= (1 << 0 as usize);
+                                    // if empty_index - candidate_index > 3 {
+                                    //     println!("????????");
+                                    //     panic!();
+                                    // }
+                                    self.hop_info[bucket_index][candidate_index] += usize::pow(2,  (self.H - 1 - (empty_index - candidate_index)) as u32);
                                     empty_index = candidate_index + (self.H - 1 - n);
                                     break;
                                 }
                             }
-                            // prepare to restart search for another swap
-                            // if empty_index - (self.H - 1) > 0 {
-                            //     start_index = empty_index - (self.H - 1)
-                            // } else {
-                            //     start_index = 0
-                            // }
                             start_index = empty_index.checked_sub((self.H - 1)).unwrap_or(0);
 
                             if empty_index - index < self.H {
@@ -451,15 +482,17 @@ impl HashTable {
                         }
                     }
                     // can't swap anything with empty space, need to resize
-                    println!("Can't swap it into the neighborhood!");
+                    println!("Can't swap it into the neighborhood! Extended!");
                     self.extend();
                     self.insert(new_key.clone(), new_value);
-                    break;
+                    return
                 }
             }
         }
         println!("No empty space!");
-        panic!();
+        self.extend();
+        self.insert(new_key.clone(), new_value);
+        return
     }
 
     // method to insert a new HashNode
@@ -467,7 +500,9 @@ impl HashTable {
         // extent the hash table once reach the load limit
         for i in 0..self.BUCKET_NUMBER {
             if (self.BUCKET_SIZE as f64 * self.load_factor).floor() as usize <= self.taken_count[i] {
+                println!("Rehash b/c load factor");
                 self.extend();
+                println!("Rehash finished");
                 self.insert(new_key.clone(), new_value);
             }
         }
@@ -491,7 +526,9 @@ impl HashTable {
                 self.insert(ori_node.key, ori_node.value);
             }
         } else {
+            println!("Rehash b/c can't get index");
             self.extend();
+            println!("Rehash finished");
             self.insert(new_key.clone(), new_value);
         };
     }
@@ -556,8 +593,8 @@ mod test_hash {
             HashFunction::FarmHash,
             HashScheme::LinearProbe,
             4,
-            ExtendOption::ExtendBucketNumber,
-            0.9,
+            ExtendOption::ExtendBucketSize,
+            0.75,
         );
 
         let name = Field::StringField(String::from("Adam"));
@@ -572,22 +609,41 @@ mod test_hash {
         let course_taken = Field::IntField(1);
         table.insert((name, course_taken), 1);
 
+        // Before first rehash: 5 * 0.75 = 3.75
+        assert_eq!(3, table.taken_count[0]);
+        assert_eq!(5, table.BUCKET_SIZE);
+
         let name = Field::StringField(String::from("David"));
         let course_taken = Field::IntField(1);
         table.insert((name, course_taken), 1);
 
-        let name = Field::StringField(String::from("Elv"));
-        let course_taken = Field::IntField(1);
+        // After first rehash: 10 * 0.75 = 7.5
+        assert_eq!(4, table.taken_count[0]);
+        assert_eq!(10, table.BUCKET_SIZE);
+
+        let name = Field::StringField(String::from("Eva"));
+        let course_taken = Field::IntField(85);
         table.insert((name, course_taken), 1);
 
         let name = Field::StringField(String::from("Frank"));
-        let course_taken = Field::IntField(1);
+        let course_taken = Field::IntField(16);
         table.insert((name, course_taken), 1);
 
-        assert_eq!(4, table.taken_count[0]);
-        assert_eq!(2, table.taken_count[1]);
-        assert_eq!(5, table.BUCKET_SIZE);
-        assert_eq!(2, table.BUCKET_NUMBER);
+        let name = Field::StringField(String::from("Grant"));
+        let course_taken = Field::IntField(63);
+        table.insert((name, course_taken), 1);
+
+        // before second rehash
+        assert_eq!(7, table.taken_count[0]);
+        assert_eq!(10, table.BUCKET_SIZE);
+
+        let name = Field::StringField(String::from("Hilton"));
+        let course_taken = Field::IntField(11);
+        table.insert((name, course_taken), 1);
+
+        // after second rehash
+        assert_eq!(8, table.taken_count[0]);
+        assert_eq!(20, table.BUCKET_SIZE);
     }
 
     // function to test hopscotch
@@ -638,6 +694,100 @@ mod test_hash {
         assert_eq!(table.hop_info[0][3], 6);
         assert_eq!(table.buckets[0][12].taken, true);
         assert_eq!(table.taken_count[0], 12);
+    }
+
+    // function to test hopscotch
+    pub fn test_hopscotch2() {
+        let mut table = HashTable::new(
+            100,
+            1,
+            HashFunction::FarmHash,
+            HashScheme::Hopscotch,
+            10,
+            ExtendOption::ExtendBucketSize,
+            0.75,
+        );
+
+        let name1 = Field::StringField(String::from("Adamdsf"));
+        let course_taken1 = Field::IntField(0);
+        table.insert((name1, course_taken1), 1);
+
+        let name2 = Field::StringField(String::from("Bensdfsdfds"));
+        let course_taken2 = Field::IntField(1);
+        table.insert((name2, course_taken2), 1);
+
+        let name3 = Field::StringField(String::from("Chrissdfds"));
+        let course_taken3 = Field::IntField(1);
+        table.insert((name3, course_taken3), 1);
+
+        let name4 = Field::StringField(String::from("Daviddf"));
+        let course_taken4 = Field::IntField(1);
+        table.insert((name4, course_taken4), 1);
+
+        let name5 = Field::StringField(String::from("Evadsfsdfsdfsdfsd"));
+        let course_taken5 = Field::IntField(85);
+        table.insert((name5, course_taken5), 1);
+
+        let name6 = Field::StringField(String::from("Franksdf"));
+        let course_taken6 = Field::IntField(16);
+        table.insert((name6, course_taken6), 1);
+
+        let name7 = Field::StringField(String::from("Grantsdf"));
+        let course_taken7 = Field::IntField(63);
+        table.insert((name7, course_taken7), 1);
+
+        let name8 = Field::StringField(String::from("Hilton"));
+        let course_taken8 = Field::IntField(11);
+        table.insert((name8, course_taken8), 1);
+
+        let name9 = Field::StringField(String::from("Idamsdfsdf"));
+        let course_taken9 = Field::IntField(23);
+        table.insert((name9, course_taken9), 1);
+
+        let name10 = Field::StringField(String::from("Jendf"));
+        let course_taken10 = Field::IntField(656);
+        table.insert((name10, course_taken10), 1);
+
+        let name11 = Field::StringField(String::from("Khrissdfs"));
+        let course_taken11 = Field::IntField(989);
+        table.insert((name11, course_taken11), 1);
+
+        let name12 = Field::StringField(String::from("Lavid"));
+        let course_taken12 = Field::IntField(45);
+        // assert_eq!(table.get_indexes((&name12, &course_taken12)).unwrap().1, 8);
+        table.insert((name12, course_taken12), 1);
+
+        let name13 = Field::StringField(String::from("Mva"));
+        let course_taken13 = Field::IntField(9879);
+        table.insert((name13, course_taken13), 1);
+
+        let name14 = Field::StringField(String::from("Nrank"));
+        let course_taken14 = Field::IntField(454);
+        table.insert((name14, course_taken14), 1);
+
+        let name15 = Field::StringField(String::from("Osdafhj"));
+        let course_taken15 = Field::StringField(String::from("Ohajd"));
+        table.insert((name15, course_taken15), 1);
+
+        let name16 = Field::StringField(String::from("Podfh"));
+        let course_taken16 = Field::StringField(String::from("Pdfki"));
+        table.insert((name16, course_taken16), 1);
+
+        let name17 = Field::StringField(String::from("Qkdsfai"));
+        let course_taken17 = Field::StringField(String::from("Qjidif"));
+        table.insert((name17, course_taken17), 1);
+
+        let name18 = Field::StringField(String::from("Rjksdf"));
+        let course_taken18 = Field::StringField(String::from("Rkdsfi"));
+        table.insert((name18, course_taken18), 1);
+
+        let name19 = Field::StringField(String::from("Sjkdfi"));
+        let course_taken19 = Field::StringField(String::from("Sjkdfi"));
+        table.insert((name19, course_taken19), 1);
+
+        let name20 = Field::StringField(String::from("Thsdud"));
+        let course_taken20 = Field::StringField(String::from("Thjksdfi"));
+        table.insert((name20, course_taken20), 1);
     }
 
     // function to test insert with robin hood scheme
@@ -1016,6 +1166,11 @@ mod test_hash {
         #[test]
         fn t_extend() {
             test_extend();
+        }
+
+        #[test]
+        fn t_hopscotch2() {
+            test_hopscotch2();
         }
 
         #[test]
